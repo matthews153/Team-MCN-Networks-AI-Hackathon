@@ -1,14 +1,58 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertCircle, FileUp, FlaskConical, Play, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
+import { AlertCircle, AlertTriangle, Ban, ChevronRight, FileUp, FlaskConical, Play, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
 import { api, CLASSES, SYMPTOMS, navigate } from '../lib'
 import { Card, ClassTag, ErrorState, Findings, TriageBadge } from '../components/ui'
+
+const ACCEPT = '.hea,.dat,.csv,.txt,.json,.npy,.zip'
+const LAST_UPLOAD_KEY = 'cardiolens.lastUpload'
+
+const FORMATS = [
+  { name: 'WFDB record', ext: ['.hea', '.dat'], how: 'Select both files of a record together, with the same name (e.g. 07005_hr.hea + 07005_hr.dat). The PhysioNet / PTB-XL format.' },
+  { name: 'CSV or text', ext: ['.csv', '.txt'], how: 'One column per lead, one row per sample, with a header row of lead names. Put the sampling rate in the file name (e.g. ecg_fs500.csv); otherwise a 10-second recording is assumed.' },
+  { name: 'JSON or NumPy', ext: ['.json', '.npy'], how: 'JSON as {"fs": 500, "signal": [[12 values], …]}, or a NumPy array of samples × 12 leads.' },
+  { name: 'ZIP', ext: ['.zip'], how: 'Any of the above bundled into one archive, for batches.' },
+]
+
+const extOf = (name) => (name.match(/\.[^.]+$/)?.[0] || '').toLowerCase()
+const stemOf = (name) => name.replace(/\.[^.]+$/, '')
+
+// Group the chosen files into ECG records: a .hea/.dat pair is one record
+function toRecords(files) {
+  const records = []
+  const wfdb = new Map()
+  files.forEach((f, i) => {
+    const ext = extOf(f.name)
+    if (ext === '.hea' || ext === '.dat') {
+      const stem = stemOf(f.name)
+      if (!wfdb.has(stem)) { wfdb.set(stem, { key: `w:${stem}`, label: stem, kind: 'WFDB record', idx: [], exts: new Set(), size: 0 }); records.push(wfdb.get(stem)) }
+      const r = wfdb.get(stem); r.idx.push(i); r.exts.add(ext); r.size += f.size
+    } else {
+      const ok = ACCEPT.split(',').includes(ext)
+      records.push({ key: `f:${i}`, label: f.name, idx: [i], size: f.size,
+        kind: ok ? FORMATS.find((x) => x.ext.includes(ext)).name : 'Not supported',
+        problem: ok ? null : (['.pdf', '.png', '.jpg', '.jpeg', '.heic', '.webp'].includes(ext)
+          ? 'Images and PDFs of ECGs are not supported — upload the digital export instead.'
+          : `"${ext || 'no extension'}" files are not supported.`) })
+    }
+  })
+  for (const r of wfdb.values()) {
+    if (!r.exts.has('.hea')) r.problem = `Missing ${r.label}.hea — select it together with the .dat file.`
+    else if (!r.exts.has('.dat')) r.problem = `Missing ${r.label}.dat — select it together with the .hea file.`
+  }
+  return records
+}
+
+function loadLastUpload() {
+  try { return JSON.parse(sessionStorage.getItem(LAST_UPLOAD_KEY)) } catch { return null }
+}
 
 export default function Analyze({ health, onDone }) {
   const [patient, setPatient] = useState({ patient_id: '', age: '', sex: '', symptoms: [], facility: '', notes: '' })
   const [files, setFiles] = useState([])
   const [drag, setDrag] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [results, setResults] = useState(null)
+  // Results of the last upload survive leaving the page (until cleared or the tab is closed)
+  const [last, setLast] = useState(loadLastUpload)
   const [err, setErr] = useState(null)
   const [samples, setSamples] = useState([])
   const [filter, setFilter] = useState('ALL')
@@ -26,11 +70,18 @@ export default function Analyze({ health, onDone }) {
   }
   const cleanPatient = () => ({ ...patient, age: patient.age === '' ? null : Number(patient.age) })
 
+  const records = toRecords(files)
+  const valid = records.filter((r) => !r.problem)
+  const removeRecord = (rec) => setFiles(files.filter((_, j) => !rec.idx.includes(j)))
+  const clearLast = () => { sessionStorage.removeItem(LAST_UPLOAD_KEY); setLast(null) }
+
   const run = async () => {
-    setBusy(true); setErr(null); setResults(null)
+    setBusy(true); setErr(null)
     try {
       const r = await api.analyzeFiles(files, cleanPatient())
-      setResults(r); setFiles([]); onDone?.()
+      const entry = { at: Date.now(), results: r }
+      sessionStorage.setItem(LAST_UPLOAD_KEY, JSON.stringify(entry))
+      setLast(entry); setFiles([]); onDone?.()
       const ok = r.filter((x) => x.case_id)
       if (ok.length === 1 && r.length === 1) navigate(`#/case/${ok[0].case_id}`)
     } catch (e) { setErr(e.message) } finally { setBusy(false) }
@@ -83,7 +134,23 @@ export default function Analyze({ health, onDone }) {
           </div>
         </Card>
 
-        <Card title="Upload ECG files" sub="WFDB (.hea + .dat), CSV (12 lead columns), JSON, NPY, or a ZIP of these. Any sampling rate — resampled to 100 Hz, 10 s." className="span-2">
+        <Card title="Upload ECG files" sub="Digital 12-lead ECG recordings. Each ECG becomes a case in your review queue." className="span-2">
+          <div className="format-guide">
+            <div className="format-guide-head">
+              <strong>Accepted files</strong>
+              <span>All 12 standard leads (I, II, III, aVR, aVL, aVF, V1–V6), ideally 10 seconds, any sampling rate</span>
+            </div>
+            <ul className="format-list">
+              {FORMATS.map((f) => (
+                <li key={f.name}>
+                  <span className="format-ext">{f.ext.map((e) => <code key={e}>{e}</code>)}</span>
+                  <span><strong>{f.name}</strong> — {f.how}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="format-no"><Ban size={13} aria-hidden="true" /> Not supported: photos, scans or PDFs of paper ECGs, and single-lead smartwatch exports.</div>
+          </div>
+
           <div className={`dropzone ${drag ? 'drag' : ''}`} role="button" tabIndex={0}
             aria-label="Choose ECG files to upload"
             onClick={(e) => { if (e.target !== inputRef.current) inputRef.current.click() }}
@@ -95,17 +162,23 @@ export default function Analyze({ health, onDone }) {
             onDrop={(e) => { e.preventDefault(); setDrag(false); addFiles(e.dataTransfer.files) }}>
             <FileUp size={34} color="var(--accent)" />
             <div style={{ fontWeight: 600, marginTop: 10 }}>Drop ECG files here or click to browse</div>
-            <div className="muted small" style={{ marginTop: 4 }}>Batch upload supported — try the files in <span className="mono">sample_uploads/</span></div>
-            <input ref={inputRef} type="file" multiple hidden aria-label="ECG files"
+            <div className="muted small" style={{ marginTop: 4 }}>Several ECGs at once are fine — try the examples in <span className="mono">sample_uploads/</span></div>
+            <input ref={inputRef} type="file" multiple hidden aria-label="ECG files" accept={ACCEPT}
               onChange={(e) => { addFiles(e.target.files); e.target.value = '' }} />
           </div>
-          {files.length > 0 && (
+          {records.length > 0 && (
             <div style={{ marginTop: 14 }}>
-              {files.map((f, i) => (
-                <div key={i} className="row between" style={{ padding: '7px 10px', background: 'var(--surface-2)', borderRadius: 8, marginBottom: 6 }}>
-                  <span className="row small"><FileUp size={14} className="muted" /> {f.name} <span className="muted">· {(f.size / 1024).toFixed(0)} KB</span></span>
-                  <button type="button" className="btn sm ghost" aria-label={`Remove ${f.name}`}
-                    onClick={() => setFiles(files.filter((_, j) => j !== i))}><X size={13} /></button>
+              {records.map((r) => (
+                <div key={r.key} className={`file-row ${r.problem ? 'bad' : ''}`}>
+                  <div className="file-row-main">
+                    <span className="row small">{r.problem ? <AlertTriangle size={14} className="file-warn" /> : <FileUp size={14} className="muted" />}
+                      <span className="file-name">{r.label}</span>
+                      <span className="muted">· {r.kind}{r.exts ? ` (${[...r.exts].sort().reverse().join(' + ')})` : ''} · {Math.max(1, Math.round(r.size / 1024))} KB</span>
+                    </span>
+                    {r.problem && <div className="file-problem">{r.problem}</div>}
+                  </div>
+                  <button type="button" className="btn sm ghost" aria-label={`Remove ${r.label}`}
+                    onClick={() => removeRecord(r)}><X size={13} /></button>
                 </div>
               ))}
             </div>
@@ -114,26 +187,36 @@ export default function Analyze({ health, onDone }) {
             <div className="small muted row"><ShieldAlert size={14} /> Prototype — not medical advice. Do not upload identifiable patient data.</div>
             <div className="row">
               {files.length > 0 && <button className="btn ghost" onClick={() => setFiles([])}><Trash2 size={14} /> Clear</button>}
-              <button className="btn primary" disabled={!files.length || busy || !health?.model_ready} onClick={run}>
-                {busy ? <span className="spinner" /> : <Upload size={15} />} Analyse {files.length > 0 ? `${files.length} file${files.length > 1 ? 's' : ''}` : ''}
+              <button className="btn primary" disabled={!valid.length || busy || !health?.model_ready} onClick={run}
+                title={records.length && !valid.length ? 'Fix or remove the files marked above' : undefined}>
+                {busy ? <span className="spinner" /> : <Upload size={15} />} Analyse {valid.length > 0 ? `${valid.length} ECG${valid.length > 1 ? 's' : ''}` : ''}
               </button>
             </div>
           </div>
           {err && <ErrorState title="Analysis could not be completed" message="Check the selected ECG files and try again." detail={err} />}
-          {results && (
-            <div style={{ marginTop: 16 }}>
-              <h3 style={{ fontSize: 13 }}>Results</h3>
-              <table className="table">
+          {last?.results?.length > 0 && (
+            <div className="last-upload">
+              <div className="row between">
+                <div>
+                  <h3 style={{ fontSize: 13, margin: 0 }}>Last upload · {new Date(last.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</h3>
+                  <div className="muted small">Click a result to open it. These cases are also in the review queue.</div>
+                </div>
+                <button className="btn sm ghost" onClick={clearLast} title="Removes this list only — the cases stay in the review queue">
+                  <X size={13} /> Clear list
+                </button>
+              </div>
+              <table className="table" style={{ marginTop: 8 }}>
                 <tbody>
-                  {results.map((r, i) => (
+                  {last.results.map((r, i) => (
                     <tr key={i} className={r.case_id ? 'click' : ''} tabIndex={r.case_id ? 0 : undefined}
                       onKeyDown={(e) => { if (r.case_id && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); navigate(`#/case/${r.case_id}`) } }}
                       onClick={() => r.case_id && navigate(`#/case/${r.case_id}`)}>
                       <td className="small">{r.name}</td>
-                      {r.error ? <td colSpan={2} style={{ color: 'var(--critical)' }} className="small">{r.error}</td> : (
+                      {r.error ? <td colSpan={3} style={{ color: 'var(--critical)' }} className="small">{r.error}</td> : (
                         <>
                           <td><Findings flagged={r.summary.flagged} category={r.summary.category} /></td>
                           <td><TriageBadge level={r.summary.triage.level} score={r.summary.triage.score} /></td>
+                          <td className="num"><ChevronRight size={15} className="muted" aria-hidden="true" /></td>
                         </>
                       )}
                     </tr>

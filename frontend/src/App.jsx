@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AlertCircle, BrainCircuit, FlaskConical, Info, LayoutDashboard, ListChecks, Menu, Upload, X } from 'lucide-react'
+import { AlertCircle, BrainCircuit, FlaskConical, Info, ShieldAlert, LayoutDashboard, ListChecks, Menu, Upload, X } from 'lucide-react'
 import { api } from './lib'
 import Dashboard from './pages/Dashboard'
 import Analyze from './pages/Analyze'
@@ -115,6 +115,7 @@ export default function App() {
               <span>{error ? 'Analysis services cannot be reached' : !health ? 'Checking API status' : health.model_ready ? `${health.ensemble_size}-model ensemble ready` : 'Model training is required'}</span>
             </div>
           </div>
+          <div className="sidebar-disclaimer" role="note"><ShieldAlert size={14} aria-hidden="true" /> This project is a prototype and is not medical advice.</div>
           <div className="sidebar-note">Research prototype · PTB-XL (PhysioNet, CC BY 4.0)</div>
         </div>
       </aside>
