@@ -38,6 +38,19 @@ if CASES_FILE.exists():
         CASES = {}
 
 
+def _tag_demo(c: dict) -> dict:
+    # Older saves did not tag demo-library analyses; PTB-XL test records are always demo data
+    if str(c.get("source", "")).startswith("PTB-XL test record"):
+        c["demo"] = True
+    return c
+
+
+for _c in CASES.values():
+    _tag_demo(_c)
+
+SNAPSHOT_DIR = DATA_DIR / "snapshots"
+
+
 def _save():
     DATA_DIR.mkdir(exist_ok=True)
     CASES_FILE.write_text(json.dumps(list(CASES.values())))
@@ -135,7 +148,7 @@ def analyze_sample(idx: int, patient: Optional[str] = Form(None)):
     p.setdefault("patient_id", f"PTBXL-{meta['ecg_id']}")
     result = engine.analyze(sigs[idx], 100, p)
     case = _new_case(result, p, f"PTB-XL test record {meta['ecg_id']}",
-                     ground_truth=meta["true_labels"])
+                     ground_truth=meta["true_labels"], demo=True)
     return case
 
 
@@ -201,11 +214,77 @@ def delete_case(cid: str):
 
 
 @app.delete("/api/cases")
-def clear_cases():
+def clear_cases(demo_only: bool = False):
+    """Delete all cases, or with ?demo_only=true only the demo/synthetic ones."""
     with _lock:
-        CASES.clear()
+        ids = [k for k, c in CASES.items() if c.get("demo")] if demo_only else list(CASES)
+        for k in ids:
+            CASES.pop(k, None)
         _save()
-    return {"ok": True}
+    return {"ok": True, "deleted": len(ids)}
+
+
+# --------------------------------------------------------------------------- #
+# Snapshots: named copies of the case list in data/snapshots/<name>.json
+def _snapshot_path(name: str) -> Path:
+    name = name.removesuffix(".json")
+    if not name or not all(ch.isalnum() or ch in "-_." for ch in name) or name.startswith("."):
+        raise HTTPException(400, "Snapshot names may only contain letters, digits, '-', '_' and '.'")
+    return SNAPSHOT_DIR / f"{name}.json"
+
+
+@app.get("/api/snapshots")
+def list_snapshots():
+    out = []
+    for f in sorted(SNAPSHOT_DIR.glob("*.json")):
+        try:
+            cases = json.loads(f.read_text())
+        except Exception:  # noqa: BLE001
+            continue
+        demo = sum(bool(_tag_demo(c).get("demo")) for c in cases)
+        out.append({"name": f.stem, "cases": len(cases), "demo": demo, "real": len(cases) - demo,
+                    "saved_at": f.stat().st_mtime})
+    return out
+
+
+@app.post("/api/snapshots/{name}")
+def save_snapshot(name: str, overwrite: bool = False):
+    """Save the current case list as a named snapshot."""
+    path = _snapshot_path(name)
+    if path.exists() and not overwrite:
+        raise HTTPException(409, f"Snapshot '{path.stem}' already exists (add --overwrite to replace it)")
+    SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
+    with _lock:
+        path.write_text(json.dumps(list(CASES.values())))
+        n = len(CASES)
+    return {"ok": True, "name": path.stem, "cases": n}
+
+
+@app.post("/api/snapshots/{name}/restore")
+def restore_snapshot(name: str, replace: bool = False, demo_only: bool = False):
+    """Bring a snapshot's cases back into the dashboard.
+
+    Default merges: cases already present (same id) are kept as they are and only missing
+    ones are added. replace=true swaps the whole case list for the snapshot.
+    demo_only=true brings back only the demo cases from the snapshot.
+    """
+    path = _snapshot_path(name)
+    if not path.exists():
+        raise HTTPException(404, f"Snapshot '{path.stem}' not found")
+    snap = [_tag_demo(c) for c in json.loads(path.read_text())]
+    if demo_only:
+        snap = [c for c in snap if c.get("demo")]
+    with _lock:
+        if replace:
+            CASES.clear()
+        added = 0
+        for c in snap:
+            if c["id"] not in CASES:
+                CASES[c["id"]] = c
+                added += 1
+        _save()
+        total = len(CASES)
+    return {"ok": True, "added": added, "skipped": len(snap) - added, "total": total}
 
 
 SYMPTOM_POOL = ["chest pain", "shortness of breath", "palpitations", "dizziness", "syncope", "fatigue"]
@@ -252,6 +331,7 @@ if DIST.exists():
     @app.get("/{path:path}")
     def spa(path: str):
         f = DIST / path
-        if path and f.is_file():
+        if path and f.is_file() and f.resolve().is_relative_to(DIST.resolve()):
             return FileResponse(f)
-        return FileResponse(DIST / "index.html")
+        # never cache the page shell, so a rebuilt dashboard shows up on the next load
+        return FileResponse(DIST / "index.html", headers={"Cache-Control": "no-cache"})

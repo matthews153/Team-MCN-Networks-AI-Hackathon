@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AlertCircle, BrainCircuit, Info, LayoutDashboard, ListChecks, Menu, Upload, X } from 'lucide-react'
+import { AlertCircle, BrainCircuit, FlaskConical, Info, LayoutDashboard, ListChecks, Menu, Upload, X } from 'lucide-react'
 import { api } from './lib'
 import Dashboard from './pages/Dashboard'
 import Analyze from './pages/Analyze'
@@ -32,6 +32,9 @@ export default function App() {
   const [cases, setCases] = useState([])
   const [error, setError] = useState(null)
   const [navOpen, setNavOpen] = useState(false)
+  // Demo / synthetic cases can be hidden so only real patients are shown (remembered per browser)
+  const [showDemo, setShowDemoState] = useState(() => localStorage.getItem('cardiolens.showDemo') !== 'false')
+  const setShowDemo = useCallback((v) => { localStorage.setItem('cardiolens.showDemo', String(v)); setShowDemoState(v) }, [])
 
   useEffect(() => {
     if (!navOpen) return
@@ -50,7 +53,10 @@ export default function App() {
   }, [])
   useEffect(() => { refresh() }, [refresh, hash])
 
-  const urgentPending = cases.filter((c) => c.triage.level === 'urgent' && c.review.status !== 'reviewed').length
+  const demoCount = cases.filter((c) => c.demo).length
+  const visibleCases = showDemo ? cases : cases.filter((c) => !c.demo)
+  const demo = { show: showDemo, setShow: setShowDemo, count: demoCount, realCount: cases.length - demoCount }
+  const urgentPending = visibleCases.filter((c) => c.triage.level === 'urgent' && c.review.status !== 'reviewed').length
   const caseMatch = hash.match(/^#\/case\/(\w+)/)
   const activeNav = NAV.find((n) => n.hash === '#/' ? hash === '#/' || hash === '' : hash.startsWith(n.hash))
   const mobileTitle = caseMatch ? 'Case review' : activeNav?.label || 'Dashboard'
@@ -58,10 +64,10 @@ export default function App() {
   let page
   if (caseMatch) page = <CaseDetail id={caseMatch[1]} onChange={refresh} />
   else if (hash.startsWith('#/analyze')) page = <Analyze health={health} onDone={refresh} />
-  else if (hash.startsWith('#/queue')) page = <Queue cases={cases} onChange={refresh} />
+  else if (hash.startsWith('#/queue')) page = <Queue cases={visibleCases} demo={demo} onChange={refresh} />
   else if (hash.startsWith('#/model')) page = <ModelInsights />
   else if (hash.startsWith('#/about')) page = <About />
-  else page = <Dashboard cases={cases} health={health} onChange={refresh} />
+  else page = <Dashboard cases={visibleCases} demo={demo} health={health} onChange={refresh} />
 
   return (
     <div className="app">
@@ -93,6 +99,15 @@ export default function App() {
           })}
         </nav>
         <div className="sidebar-foot">
+          <label className="demo-toggle" title="Demo cases are built from unseen PTB-XL test ECGs with synthetic patient details">
+            <FlaskConical size={15} aria-hidden="true" />
+            <span>
+              <strong>Demo data</strong>
+              <small>{showDemo ? `Showing ${demoCount} demo case${demoCount === 1 ? '' : 's'}` : 'Hidden — real patients only'}</small>
+            </span>
+            <input type="checkbox" role="switch" checked={showDemo} onChange={(e) => setShowDemo(e.target.checked)} />
+            <span className="switch" aria-hidden="true" />
+          </label>
           <div className="connection-status">
             <span className={`status-dot ${error ? 'offline' : health?.model_ready ? 'online' : 'pending'}`} />
             <div>
@@ -117,7 +132,7 @@ export default function App() {
           <AlertCircle size={17} aria-hidden="true" />
           <div>
             <strong>Backend connection unavailable</strong>
-            <p>ECG analysis and case data require the CardioLens API. Start the local service with <code>uvicorn backend.app:app --port 8000</code>.</p>
+            <p>ECG analysis and case data require the CardioLens API. Start it with <code>python3 Main.py</code> from the project folder.</p>
             <details><summary>Connection details</summary><span>{error}</span></details>
           </div>
         </div>}

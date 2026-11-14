@@ -48,6 +48,7 @@ export const api = {
   }),
   del: (id) => req(`/api/cases/${id}`, { method: 'DELETE' }),
   clear: () => req('/api/cases', { method: 'DELETE' }),
+  clearDemo: () => req('/api/cases?demo_only=true', { method: 'DELETE' }),
   seed: () => req('/api/demo/seed', { method: 'POST' }),
 }
 

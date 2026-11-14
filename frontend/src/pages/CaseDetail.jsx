@@ -55,7 +55,7 @@ export default function CaseDetail({ id, onChange }) {
       <div className="page-head">
         <div>
           <button className="btn sm ghost no-print" onClick={() => history.back()} style={{ marginBottom: 8 }}><ArrowLeft size={14} /> Back</button>
-          <h2 className="row">Case {c.patient?.patient_id || c.id} <TriageBadge level={r.triage.level} score={r.triage.score} large /></h2>
+          <h2 className="row">Case {c.patient?.patient_id || c.id}{c.demo && <span className="demo-tag" title="Demo case built from a PTB-XL test ECG">Demo</span>} <TriageBadge level={r.triage.level} score={r.triage.score} large /></h2>
           <p>
             {c.patient?.age ? `${Math.round(c.patient.age)} y` : 'Age —'} · {c.patient?.sex === 'F' ? 'Female' : c.patient?.sex === 'M' ? 'Male' : 'Sex —'}
             {c.patient?.facility ? ` · ${c.patient.facility}` : ''} · {c.source} · received {fmtDate(c.created_at)}

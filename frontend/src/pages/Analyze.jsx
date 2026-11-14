@@ -19,7 +19,11 @@ export default function Analyze({ health, onDone }) {
 
   const set = (k, v) => setPatient((p) => ({ ...p, [k]: v }))
   const toggleSym = (s) => set('symptoms', patient.symptoms.includes(s) ? patient.symptoms.filter((x) => x !== s) : [...patient.symptoms, s])
-  const addFiles = (list) => setFiles((f) => [...f, ...Array.from(list)])
+  // Copy the FileList right away: the picker's list is live and is emptied when the input is reset
+  const addFiles = (list) => {
+    const picked = Array.from(list || [])
+    if (picked.length) setFiles((f) => [...f, ...picked])
+  }
   const cleanPatient = () => ({ ...patient, age: patient.age === '' ? null : Number(patient.age) })
 
   const run = async () => {

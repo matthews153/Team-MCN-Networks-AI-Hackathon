@@ -1,14 +1,21 @@
 import { useMemo, useState } from 'react'
-import { Download, Search, Trash2 } from 'lucide-react'
+import { Download, FlaskConical, Search, Trash2 } from 'lucide-react'
 import { api, CLASSES, CLASS_COLORS, CLASS_SHORT, TRIAGE, fmtDate, navigate } from '../lib'
 import { Card, Findings, TriageBadge } from '../components/ui'
 
-export default function Queue({ cases, onChange }) {
+export default function Queue({ cases, demo, onChange }) {
   const [level, setLevel] = useState('all')
   const [status, setStatus] = useState('pending')
   const [finding, setFinding] = useState('all')
   const [q, setQ] = useState('')
   const [sort, setSort] = useState('priority')
+
+  // Reading order among the cases currently shown (demo toggle respected): most urgent first,
+  // ties broken by who has waited longest. The 0–100 score itself is per patient and never changes.
+  const queuePos = useMemo(() => {
+    const pending = cases.filter((c) => c.review.status !== 'reviewed').sort(byPriority)
+    return { rank: new Map(pending.map((c, i) => [c.id, i + 1])), total: pending.length }
+  }, [cases])
 
   const rows = useMemo(() => {
     let r = cases.filter((c) =>
@@ -17,7 +24,7 @@ export default function Queue({ cases, onChange }) {
       (finding === 'all' || (finding === 'NORM' ? c.category === 'normal' : c.flagged.includes(finding))) &&
       (!q || JSON.stringify([c.patient, c.source]).toLowerCase().includes(q.toLowerCase())))
     r = [...r].sort((a, b) => sort === 'priority'
-      ? TRIAGE[a.triage.level].order - TRIAGE[b.triage.level].order || b.triage.score - a.triage.score
+      ? byPriority(a, b)
       : sort === 'newest' ? b.created_at - a.created_at : a.quality.score - b.quality.score)
     return r
   }, [cases, level, status, finding, q, sort])
@@ -29,7 +36,18 @@ export default function Queue({ cases, onChange }) {
     const blob = new Blob([[head.join(','), ...lines].join('\n')], { type: 'text/csv' })
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'cardiolens_queue.csv'; a.click()
   }
-  const clearAll = async () => { if (confirm('Delete ALL cases?')) { await api.clear(); onChange?.() } }
+  const clearAll = async () => {
+    const real = demo?.realCount ?? 0
+    const msg = real
+      ? `Delete ALL cases, including ${real} real patient case${real === 1 ? '' : 's'}? This cannot be undone.`
+      : 'Delete ALL cases? This cannot be undone.'
+    if (confirm(msg)) { await api.clear(); onChange?.() }
+  }
+  const clearDemo = async () => {
+    if (confirm(`Remove ${demo.count} demo case${demo.count === 1 ? '' : 's'}? Real patient cases are kept.`)) {
+      await api.clearDemo(); onChange?.()
+    }
+  }
 
   return (
     <div>
@@ -40,6 +58,7 @@ export default function Queue({ cases, onChange }) {
         </div>
         <div className="row">
           <button className="btn" onClick={exportCsv}><Download size={15} /> Export CSV</button>
+          {demo?.count > 0 && <button className="btn" onClick={clearDemo}><FlaskConical size={15} /> Remove demo cases</button>}
           <button className="btn danger ghost" onClick={clearAll}><Trash2 size={15} /> Clear all</button>
         </div>
       </div>
@@ -87,8 +106,9 @@ export default function Queue({ cases, onChange }) {
                 <tr key={c.id} className="click" tabIndex={0}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`#/case/${c.id}`) } }}
                   onClick={() => navigate(`#/case/${c.id}`)}>
-                  <td><TriageBadge level={c.triage.level} score={c.triage.score} /></td>
-                  <td><strong>{c.patient?.patient_id || c.id}</strong><div className="muted small">{c.patient?.age ? `${Math.round(c.patient.age)}y` : ''} {c.patient?.sex || ''} {c.patient?.facility ? `· ${c.patient.facility}` : ''}</div></td>
+                  <td><TriageBadge level={c.triage.level} score={c.triage.score} />
+                    {queuePos.rank.has(c.id) && <div className="muted small queue-pos" title="Reading order among the pending cases shown">#{queuePos.rank.get(c.id)} of {queuePos.total} to read</div>}</td>
+                  <td><strong>{c.patient?.patient_id || c.id}</strong>{c.demo && <span className="demo-tag" title="Demo case built from a PTB-XL test ECG">Demo</span>}<div className="muted small">{c.patient?.age ? `${Math.round(c.patient.age)}y` : ''} {c.patient?.sex || ''} {c.patient?.facility ? `· ${c.patient.facility}` : ''}</div></td>
                   <td><Findings flagged={c.flagged} category={c.category} />{c.uncertain.length > 0 && c.flagged.length > 0 && <div className="muted" style={{ fontSize: 11 }}>uncertain: {c.uncertain.join(', ')}</div>}</td>
                   <td><Spark probs={c.probs} /></td>
                   <td className="small text-2" style={{ maxWidth: 170 }}>{c.patient?.symptoms?.length ? c.patient.symptoms.join(', ') : '—'}</td>
@@ -116,4 +136,10 @@ function Spark({ probs }) {
       ))}
     </div>
   )
+}
+
+function byPriority(a, b) {
+  return TRIAGE[a.triage.level].order - TRIAGE[b.triage.level].order
+    || b.triage.score - a.triage.score
+    || a.created_at - b.created_at
 }

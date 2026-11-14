@@ -8,7 +8,7 @@ import { axisProps, Card, ChartTip, Findings, gridProps, Kpi, Legend, TriageBadg
 
 const DAY = 86400
 
-export default function Dashboard({ cases, health, onChange }) {
+export default function Dashboard({ cases, demo, health, onChange }) {
   const [seeding, setSeeding] = useState(false)
   const [range, setRange] = useState(7)
 
@@ -62,7 +62,7 @@ export default function Dashboard({ cases, health, onChange }) {
 
   const seed = async () => {
     setSeeding(true)
-    try { await api.seed(); await onChange() } finally { setSeeding(false) }
+    try { await api.seed(); demo?.setShow(true); await onChange() } finally { setSeeding(false) }
   }
 
   if (!cases.length) {
@@ -71,13 +71,15 @@ export default function Dashboard({ cases, health, onChange }) {
         <Head />
         <div className="empty-workspace">
           <div>
-            <h3>No ECGs analysed yet</h3>
-            <p>Upload a 12-lead ECG to start a review queue, or load cases built from unseen PTB-XL test records.</p>
+            <h3>{demo && !demo.show && demo.count ? 'No real patient ECGs yet' : 'No ECGs analysed yet'}</h3>
+            <p>{demo && !demo.show && demo.count
+              ? `${demo.count} demo case${demo.count === 1 ? ' is' : 's are'} hidden. Upload a 12-lead ECG to start your real review queue, or switch "Demo data" on in the sidebar.`
+              : 'Upload a 12-lead ECG to start a review queue, or load cases built from unseen PTB-XL test records.'}</p>
           </div>
           <div className="row empty-actions">
             <button className="btn primary" onClick={() => navigate('#/analyze')}><Upload size={15} /> Analyse an ECG</button>
-            <button className="btn" onClick={seed} disabled={seeding || !health?.model_ready}>
-              {seeding ? <span className="spinner" /> : <FlaskConical size={15} />} Load demo cases
+            <button className="btn" onClick={demo && !demo.show && demo.count ? () => demo.setShow(true) : seed} disabled={seeding || !health?.model_ready}>
+              {seeding ? <span className="spinner" /> : <FlaskConical size={15} />} {demo && !demo.show && demo.count ? 'Show demo cases' : 'Load demo cases'}
             </button>
           </div>
         </div>

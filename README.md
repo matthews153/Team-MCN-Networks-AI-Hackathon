@@ -23,18 +23,35 @@ The app then ranks the doctor's review queue so the most urgent ECGs are read fi
 ## Quick start
 
 ```bash
-# 1. Python env (Python 3.9+)
+# 1. Python env (Python 3.9+), once
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
-# 2. Frontend build (Node 18+)
-cd frontend && npm install && npm run build && cd ..
-
-# 3. Run (serves the API + built dashboard on http://localhost:8000)
-.venv/bin/uvicorn backend.app:app --port 8000
+# 2. Run: one server for the API + dashboard on http://127.0.0.1:8000
+.venv/bin/python Main.py
 ```
 
-Trained weights are committed in `artifacts/`, so the app runs without retraining.
-For frontend development with hot reload, run `npm run dev` in `frontend/` (port 5173, proxies `/api` to 8000).
+`Main.py` builds the dashboard on first run, or whenever the frontend source has changed (this needs Node.js 18+ and installs `frontend/node_modules` automatically). It then serves everything from a single uvicorn process and opens your browser. Trained weights are committed in `artifacts/`, so the app runs without retraining.
+
+| Command | What it does |
+|---|---|
+| `python Main.py` | one server, API + dashboard on port 8000 |
+| `python Main.py --dev` | UI development: Vite hot reload on :5173, API auto-reload on :8000 |
+| `python Main.py --rebuild` | force a fresh dashboard build |
+| `python Main.py --port 9000 --no-browser` | different port, don't open a browser |
+
+**Demo data:** *Load demo cases* on the empty dashboard creates 24 synthetic patients from unseen PTB-XL test ECGs; they are tagged **Demo**. The **Demo data** switch in the sidebar hides or shows them, so only real uploads are left on the dashboard and in the queue. **Remove demo cases** in the review queue deletes only the demo cases and keeps real patients.
+
+**Snapshots (save and bring back case lists):** cases live in `data/cases.json`. Named copies are kept in `data/snapshots/`, which is local only and not committed.
+
+```bash
+python3 cases.py list                          # saved snapshots and what's on the dashboard now
+python3 cases.py save before_demo              # save the current cases
+python3 cases.py restore before_demo           # bring them back (merges; existing cases are kept)
+python3 cases.py restore before_demo --demo-only   # only the demo cases
+python3 cases.py restore before_demo --replace     # replace the current cases entirely
+```
+
+These commands work whether or not CardioLens is running. If it is, the dashboard updates straight away.
 
 ### Retraining from scratch
 
@@ -83,7 +100,7 @@ unzip ptbxl.zip && rm ptbxl.zip && cd ..
 * **Dashboard:** KPIs (volume, urgent unreviewed, pending, AI–clinician agreement, time to review, signal quality), daily volume by priority, triage mix, urgent worklist, findings by category and age group, priority-score distribution.
 * **New analysis:** patient context (age, sex, symptoms), drag-and-drop batch upload, and a demo library of unseen test-fold ECGs with their cardiologist labels.
 * **Case view:** 12-lead ECG on standard paper (3×4 + rhythm strip, or 12×10 s) with an AI-attention overlay, single-lead inspector with detected beats, probability bars with thresholds and per-model dots, radar profile, lead-importance heatmap, per-lead quality, an AI narrative report, and a clinician review panel (agree or override). The page can be printed.
-* **Review queue:** filter, sort, search, and CSV export.
+* **Review queue:** filter, sort, search, CSV export, and removal of demo cases only.
 * **Model insights:** baseline comparison, normal/abnormal confusion matrix, per-class metrics with **missed cases and false alarms reported separately**, ROC/PR curves, failure butterfly chart, fairness by sex and age, calibration, training curves, dataset composition and label co-occurrence, and the hardest test cases.
 
 ---
