@@ -16,6 +16,11 @@ export const TRIAGE = {
 }
 export const SYMPTOMS = ['chest pain', 'shortness of breath', 'palpitations', 'dizziness', 'syncope', 'fatigue']
 
+// The server API version this dashboard needs (backend/app.py API_VERSION). An older server
+// process still running after a `git pull` is detected and reported instead of failing oddly.
+export const REQUIRED_API = 4
+export const serverOutdated = (health) => !!health && (health.api_version ?? 0) < REQUIRED_API
+
 // Name-only sign-in: the chosen doctor is remembered per browser and sent with every request
 const DOCTOR_KEY = 'cardiolens.doctor'
 export const getDoctor = () => localStorage.getItem(DOCTOR_KEY) || ''
@@ -61,6 +66,10 @@ export const api = {
   addDoctor: (name) => req('/api/doctors', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
   }),
+  renameDoctor: (name, newName) => req('/api/doctors', {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, new_name: newName }),
+  }),
+  deleteDoctor: (name) => req(`/api/doctors?name=${encodeURIComponent(name)}`, { method: 'DELETE' }),
   facilities: () => req('/api/facilities'),
   patient: (pid) => req(`/api/patients/${encodeURIComponent(pid)}`),
 }

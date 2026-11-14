@@ -7,6 +7,7 @@ import {
   Printer, ShieldAlert, Stethoscope, Trash2, XCircle,
 } from 'lucide-react'
 import ECGViewer, { LeadDetail } from '../components/ECGViewer'
+import VoltageCheck from '../components/VoltageCheck'
 import { api, CLASSES, CLASS_COLORS, CLASS_NAMES, CLASS_SHORT, fmtDate, navigate, pct } from '../lib'
 import { Card, ChartTip, ClassTag, ErrorState, TriageBadge } from '../components/ui'
 
@@ -155,6 +156,10 @@ export default function CaseDetail({ id, onChange }) {
             </RadarChart>
           </ResponsiveContainer>
         </Card>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <VoltageCheck v={r.lvh_voltage} aiHyp={r.flagged.includes('HYP')} />
       </div>
 
       <div className="grid g-3" style={{ marginBottom: 16 }}>

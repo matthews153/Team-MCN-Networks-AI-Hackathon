@@ -32,9 +32,9 @@ export default function Queue({ cases, demo, doctor, onChange }) {
   }, [cases, level, status, finding, q, sort, who, doctor])
 
   const exportCsv = () => {
-    const head = ['case_id', 'patient_id', 'age', 'sex', 'priority', 'score', 'findings', ...CLASSES.map((c) => `p_${c}`), 'quality', 'hr', 'review_status', 'doctor_labels', 'agrees', 'received']
+    const head = ['case_id', 'patient_id', 'age', 'sex', 'priority', 'score', 'findings', ...CLASSES.map((c) => `p_${c}`), 'quality', 'hr', 'review_status', 'doctor_labels', 'agrees', 'received', 'uploaded_by', 'reviewed_by']
     const lines = rows.map((c) => [c.id, c.patient?.patient_id || '', c.patient?.age ?? '', c.patient?.sex || '', c.triage.level, c.triage.score, c.flagged.join('|'),
-      ...CLASSES.map((k) => c.probs[k].toFixed(3)), c.quality.score, c.heart_rate ?? '', c.review.status, (c.review.doctor_labels || []).join('|'), c.review.agrees ?? '', new Date(c.created_at * 1000).toISOString()].join(','))
+      ...CLASSES.map((k) => c.probs[k].toFixed(3)), c.quality.score, c.heart_rate ?? '', c.review.status, (c.review.doctor_labels || []).join('|'), c.review.agrees ?? '', new Date(c.created_at * 1000).toISOString(), csvCell(c.uploaded_by), csvCell(c.review.reviewed_by)].join(','))
     const blob = new Blob([[head.join(','), ...lines].join('\n')], { type: 'text/csv' })
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'cardiolens_queue.csv'; a.click()
   }
@@ -106,9 +106,10 @@ export default function Queue({ cases, demo, doctor, onChange }) {
 
       <Card>
         {rows.length === 0 ? <div className="empty">No cases match these filters.</div> : (
-          <table className="table">
+          <div className="table-scroll">
+          <table className="table queue-table">
             <thead>
-              <tr><th>Priority</th><th>Patient</th><th>AI interpretation</th><th>Probabilities</th><th>Symptoms</th><th className="num">HR</th><th className="num">Quality</th><th>Status</th><th>Received</th></tr>
+              <tr><th>Priority</th><th>Patient</th><th>AI interpretation</th><th>Probabilities</th><th>Symptoms</th><th className="num">HR</th><th className="num">Quality</th><th>Status</th><th>Received</th><th>Uploaded by</th></tr>
             </thead>
             <tbody>
               {rows.map((c) => (
@@ -127,11 +128,13 @@ export default function Queue({ cases, demo, doctor, onChange }) {
                     ? <span className={`badge ${c.review.agrees ? 'routine' : 'priority'}`}>{c.review.agrees ? 'Agreed' : 'Overridden'}</span>
                     : <span className="badge neutral">Pending</span>}
                     {c.review.reviewed_by && <div className="muted small signed-by">by {c.review.reviewed_by}</div>}</td>
-                  <td className="muted small">{fmtDate(c.created_at)}{c.uploaded_by && <div className="signed-by">by {c.uploaded_by}</div>}</td>
+                  <td className="muted small">{fmtDate(c.created_at)}</td>
+                  <td className="small uploader">{c.uploaded_by || <span className="muted" title={c.demo ? 'Demo case' : 'Uploaded before sign-in existed'}>{c.demo ? 'Demo' : '—'}</span>}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </Card>
     </div>
@@ -152,4 +155,11 @@ function byPriority(a, b) {
   return TRIAGE[a.triage.level].order - TRIAGE[b.triage.level].order
     || b.triage.score - a.triage.score
     || a.created_at - b.created_at
+}
+
+// quote a free-text CSV value (names may contain commas)
+function csvCell(v) {
+  if (v == null || v === '') return ''
+  const t = String(v)
+  return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t
 }

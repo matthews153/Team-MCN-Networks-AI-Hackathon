@@ -81,14 +81,42 @@ def _guess_fs(n: int, name: str) -> float:
     return 100.0
 
 
+LEAD_LIST = "I, II, III, aVR, aVL, aVF, V1–V6"
+
+
+def _shape_problem(arr: np.ndarray) -> str:
+    """Plain-language explanation of why an array isn't one 12-lead recording."""
+    if arr.ndim == 1:
+        return (f"This file holds a single list of {arr.shape[0]:,} values — one signal at most. "
+                f"CardioLens needs all 12 standard leads ({LEAD_LIST}) recorded together.")
+    if arr.ndim != 2:
+        return f"This file holds a {arr.ndim}-dimensional array; CardioLens needs a table of samples × 12 leads."
+    rows, cols = arr.shape
+    signals, length = min(rows, cols), max(rows, cols)
+    if signals < 12:
+        return (f"This file has only {signals} signal column{'s' if signals != 1 else ''} ({length:,} samples). "
+                f"CardioLens needs all 12 standard leads ({LEAD_LIST}) recorded at the same time — "
+                "single-lead or partial recordings (e.g. smartwatch, Holter or MIT-BIH exports) can't be analysed.")
+    last = arr[:, -1]
+    labels = np.all(np.isin(last[~np.isnan(last)], [0, 1, 2, 3, 4, 5]))
+    return (f"This file is a table of {rows:,} rows × {cols:,} columns, not one ECG recording. "
+            f"CardioLens needs 12 columns — one per lead ({LEAD_LIST}) — with one row per time point "
+            "(e.g. 5,000 rows for 10 seconds at 500 Hz). "
+            + ("Its last column looks like a label (0/1), so each row is probably one separate heartbeat or "
+               "example — as in the ECG5000 / Kaggle 'ecg.csv' dataset — which can't be read as a 12-lead ECG."
+               if labels else
+               "If this is a 12-lead recording with extra columns (time, index, other channels), add a header "
+               "row with the lead names so the 12 leads can be picked out."))
+
+
 def _orient(arr: np.ndarray) -> np.ndarray:
     arr = np.asarray(arr, dtype=np.float32)
     if arr.ndim != 2:
-        raise ParseError(f"Expected a 2-D array, got shape {arr.shape}")
+        raise ParseError(_shape_problem(arr))
     if arr.shape[1] != 12 and arr.shape[0] == 12:
         arr = arr.T
     if arr.shape[1] != 12:
-        raise ParseError(f"Expected 12 leads, got shape {arr.shape}")
+        raise ParseError(_shape_problem(arr))
     # Heuristic unit fix: values in µV instead of mV
     if np.nanmax(np.abs(arr)) > 50:
         arr = arr / 1000.0
@@ -103,9 +131,30 @@ def _parse_csv(data: bytes, name: str):
     if any(re.search(r"[a-zA-Z]", t) for t in first):
         body = text[1:]
         idx = [_ALIASES.get(t.lower()) for t in first]
-        if sum(i is not None for i in idx) >= 12:
+        found = sorted({i for i in idx if i is not None})
+        if len(found) == 12:
             order = idx
-    rows = [[float(v) for v in re.split(r"[,;\t]", r) if v.strip() != ""] for r in body if r.strip()]
+        elif found:
+            missing = [LEADS[i] for i in range(12) if i not in found]
+            raise ParseError(f"The header names {len(found)} of the 12 standard leads "
+                             f"({', '.join(LEADS[i] for i in found)}); missing: {', '.join(missing)}. "
+                             "CardioLens needs all 12 leads recorded together.")
+    rows = []
+    for n, r in enumerate(body, start=2 if body is not text else 1):
+        if not r.strip():
+            continue
+        try:
+            rows.append([float(v) for v in re.split(r"[,;\t]", r) if v.strip() != ""])
+        except ValueError:
+            bad = next(v for v in re.split(r"[,;\t]", r) if v.strip() and not _is_number(v))
+            raise ParseError(f"Line {n} contains a non-numeric value ({bad.strip()[:20]!r}). Apart from an "
+                             "optional header row of lead names, every value must be a number.") from None
+    if not rows:
+        raise ParseError("The file has no data rows.")
+    widths = {len(r) for r in rows}
+    if len(widths) > 1:
+        raise ParseError(f"Rows have different numbers of values ({min(widths)}–{max(widths)} per row). "
+                         "A 12-lead CSV has the same 12 values on every row.")
     arr = np.array(rows, dtype=np.float32)
     if order is not None:
         out = np.zeros((arr.shape[0], 12), dtype=np.float32)
@@ -119,10 +168,26 @@ def _parse_csv(data: bytes, name: str):
     return arr, _guess_fs(arr.shape[0], name)
 
 
+def _is_number(v: str) -> bool:
+    try:
+        float(v)
+        return True
+    except ValueError:
+        return False
+
+
 def _parse_json(data: bytes, name: str):
     obj = json.loads(data)
+    if not isinstance(obj, dict) or ("leads" not in obj and "signal" not in obj):
+        raise ParseError('JSON files need a "signal" array (samples × 12 leads) or a "leads" object '
+                         'with one array per lead, e.g. {"fs": 500, "signal": [[12 values], ...]}.')
     if "leads" in obj:
-        arr = np.stack([np.asarray(obj["leads"][l], dtype=np.float32) for l in LEADS], axis=1)
+        have = {k.lower(): v for k, v in obj["leads"].items()}
+        missing = [l for l in LEADS if l.lower() not in have]
+        if missing:
+            raise ParseError(f"The JSON is missing lead{'s' if len(missing) > 1 else ''} {', '.join(missing)}. "
+                             f"CardioLens needs all 12 standard leads ({LEAD_LIST}).")
+        arr = np.stack([np.asarray(have[l.lower()], dtype=np.float32) for l in LEADS], axis=1)
     else:
         arr = np.asarray(obj["signal"], dtype=np.float32)
     arr = _orient(arr)

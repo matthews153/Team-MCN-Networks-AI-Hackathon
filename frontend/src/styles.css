@@ -549,4 +549,42 @@ fieldset.field legend { margin-bottom: 6px; padding: 0; color: var(--text-2); fo
 .signin-new .field { flex: 1; }
 .signin-foot { display: flex; gap: 7px; align-items: flex-start; margin-top: 18px; color: var(--muted); font-size: 11.5px; line-height: 1.45; }
 .signin-foot svg { flex: 0 0 auto; margin-top: 1px; }
-.dictate-btn { justify-content: center; width: 100%; }
+.signin-row { display: flex; align-items: center; gap: 4px; }
+.signin-row .signin-doctor { flex: 1; min-width: 0; }
+.signin-doctor.editing { cursor: default; border-color: var(--accent); background: var(--accent-wash); padding: 6px 8px 6px 12px; }
+.signin-doctor.editing .input { flex: 1; min-width: 0; padding: 6px 8px; }
+.icon-btn {
+  display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; flex: 0 0 auto;
+  border: 1px solid transparent; border-radius: var(--radius); background: transparent; color: var(--muted); cursor: pointer;
+}
+.icon-btn:hover:not(:disabled), .icon-btn:focus-visible { border-color: var(--border); color: var(--text); background: var(--surface-2); }
+.icon-btn.danger:hover:not(:disabled) { color: var(--critical); }
+.icon-btn:disabled { opacity: .4; cursor: default; }
+.uploader { white-space: nowrap; }
+.queue-table { min-width: 980px; }
+div.field { display: flex; flex-direction: column; gap: 6px; }
+.notes-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.notes-head label { color: var(--text-2); font-size: 12px; font-weight: 520; }
+.hide-library { white-space: nowrap; margin-left: 4px; }
+
+/* ---- LVH voltage check ---- */
+.voltage-banner { display: flex; gap: 8px; align-items: flex-start; padding: 9px 11px; border-radius: var(--radius); font-size: 12.5px; line-height: 1.45; margin-bottom: 12px; }
+.voltage-banner svg { flex: 0 0 auto; margin-top: 1px; }
+.voltage-banner.warn { background: #fdf8ec; border: 1px solid #e8d8ae; color: var(--text); }
+.voltage-banner.warn svg { color: var(--warning); }
+.voltage-banner.ok { background: var(--accent-wash); color: var(--text); }
+.voltage-banner.ok svg { color: var(--accent); }
+.voltage-banner.neutral { background: var(--surface-2); color: var(--text-2); }
+.voltage-banner.neutral svg { color: var(--muted); }
+.voltage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.voltage-item { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); }
+.voltage-value { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.voltage-value span { font-size: 13px; font-weight: 500; color: var(--muted); }
+.voltage-meter { position: relative; height: 8px; border-radius: 4px; background: var(--surface-3); }
+.voltage-fill { height: 100%; border-radius: 4px; background: var(--axis); }
+.voltage-fill.met { background: var(--warning); }
+.voltage-fill.borderline { background: #c9a14a; }
+.voltage-cut { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--text); border-radius: 1px; }
+.voltage-pill { padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: var(--surface-3); color: var(--text-2); }
+.voltage-pill.met { background: #fdf1d8; color: #7a5310; }
+.voltage-pill.borderline { background: #fbf4e4; color: #7a5310; }

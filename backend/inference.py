@@ -10,6 +10,7 @@ import torch
 from ml.config import ARTIFACTS_DIR, CLASSES, CLASS_INFO, LEADS, SAMPLING_RATE
 from ml.model import ResNet1d
 from ml.preprocess import bandpass, resample_to_target, rhythm_metrics, signal_quality, standardize
+from ml.voltage import lvh_voltage
 
 ABN = [c for c in CLASSES if c != "NORM"]
 # How much each abnormal finding contributes to review priority (clinical urgency proxy)
@@ -102,7 +103,15 @@ class Engine:
 
         uncertain = [f["code"] for f in findings
                      if (f["confidence"] == "low") or (0 < f["model_votes"] < 1)]
+        voltage = lvh_voltage(x_raw, patient.get("sex"), _num(patient.get("age")), rhythm["r_peaks"])
+        # how often a flag like this one was real hypertrophy on the test set (from ml.eval_voltage)
+        lv = self.metrics.get("lvh_voltage")
+        if lv and voltage.get("status") in ("met", "borderline") and "HYP" not in flagged:
+            k = voltage["status"]
+            hits, alarms = lv[f"ai_misses_{k}"], lv[f"extra_alarms_{k}"]
+            voltage["test_hit_rate"] = {"hits": hits, "total": hits + alarms}
         triage = self._triage(p, flagged, quality, uncertain, patient, rhythm)
+        add_voltage_note(triage, voltage, flagged)
 
         if flagged:
             headline = "Abnormal ECG — " + ", ".join(CLASS_INFO[c]["name"] for c in flagged)
@@ -124,7 +133,8 @@ class Engine:
             "triage": triage,
             "quality": quality,
             "rhythm": rhythm,
-            "narrative": self._narrative(flagged, findings, quality, rhythm, triage, uncertain),
+            "narrative": self._narrative(flagged, findings, quality, rhythm, triage, uncertain, voltage),
+            "lvh_voltage": voltage,
             "lead_importance": {c: lead_imp[j].round(4).tolist() for j, c in enumerate(CLASSES)},
             "saliency": sal.round(3).tolist(),                    # (12, 1000) for focus class
             "signal": x_raw.T.round(4).tolist(),                  # (12, 1000) mV
@@ -188,7 +198,7 @@ class Engine:
         return {"level": level, "label": labels[level], "score": score, "reasons": reasons,
                 "suggested_action": actions[level]}
 
-    def _narrative(self, flagged, findings, quality, rhythm, triage, uncertain):
+    def _narrative(self, flagged, findings, quality, rhythm, triage, uncertain, voltage=None):
         parts = []
         hr = rhythm.get("heart_rate")
         if hr:
@@ -210,7 +220,55 @@ class Engine:
         if uncertain:
             parts.append("Borderline or disputed outputs for " + ", ".join(uncertain) +
                          " — interpret with caution.")
+        if voltage and voltage.get("available"):
+            parts.append(voltage_sentence(voltage, "HYP" in flagged))
         parts.append(f"AI review priority: {triage['label']} (score {triage['score']:.0f}/100).")
         parts.append("This is an AI-generated prototype interpretation and is not medical advice; "
                      "final interpretation rests with the reviewing clinician.")
         return " ".join(parts)
+
+
+# --------------------------------------------------------------------------- #
+# LVH voltage criteria: a rule-based safety net shown next to the AI
+def _num(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def voltage_summary(v: dict) -> str:
+    met = [n for n, k in (("Sokolow-Lyon", "sokolow"), ("Cornell", "cornell")) if v[k]["met"]]
+    near = [n for n, k in (("Sokolow-Lyon", "sokolow"), ("Cornell", "cornell")) if v[k].get("borderline")]
+    show = met or near
+    vals = ", ".join(f"{n} {v['sokolow' if n.startswith('S') else 'cornell']['value']:.1f} mV" for n in show)
+    return vals
+
+
+def voltage_sentence(v: dict, ai_hyp: bool) -> str:
+    st = v.get("status")
+    if st == "met":
+        return (f"QRS voltage meets LVH criteria ({voltage_summary(v)})" +
+                (" — consistent with the AI's hypertrophy finding." if ai_hyp else
+                 " although the AI did not flag hypertrophy — consider checking for hypertrophy."))
+    if st == "borderline":
+        return (f"QRS voltage is borderline for LVH ({voltage_summary(v)}, within 10% of the cut-off)" +
+                ("." if ai_hyp else " — the AI did not flag hypertrophy."))
+    return ("QRS voltage is below LVH criteria" +
+            (" — voltage criteria miss many cases of hypertrophy, so this does not contradict the AI." if ai_hyp else "."))
+
+
+def add_voltage_note(triage: dict, v: dict, flagged: list) -> None:
+    """Add a review reason when voltage criteria point to hypertrophy the AI did not flag.
+    The review priority itself is left to the AI triage rule."""
+    if not v.get("available") or "HYP" in flagged:
+        return
+    if v["status"] == "met":
+        triage["reasons"].insert(len(flagged), f"Meets LVH voltage criteria ({voltage_summary(v)}) — AI did not flag hypertrophy")
+    elif v["status"] == "borderline":
+        triage["reasons"].append(f"Borderline LVH voltage ({voltage_summary(v)})")
+    else:
+        return
+    none = "No abnormal pattern detected above threshold"
+    if none in triage["reasons"]:
+        triage["reasons"].remove(none)

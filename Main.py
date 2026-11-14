@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -29,6 +31,9 @@ FRONTEND = ROOT / "frontend"
 DIST_INDEX = FRONTEND / "dist" / "index.html"
 VITE = FRONTEND / "node_modules" / "vite" / "bin" / "vite.js"
 HOST = "127.0.0.1"
+# the API version this checkout's backend provides (read from backend/app.py, no heavy imports)
+_m = re.search(r"^API_VERSION = (\d+)", (ROOT / "backend" / "app.py").read_text(), re.M)
+API_VERSION = int(_m.group(1)) if _m else 0
 DEV_PORT = 5173
 # Files whose changes mean the dashboard must be rebuilt
 FRONTEND_SOURCES = ["src", "index.html", "package.json", "package-lock.json", "vite.config.js"]
@@ -90,10 +95,27 @@ def check_python_deps() -> None:
                            "Run `python3 -m pip install -r requirements.txt`.")
 
 
+def running_cardiolens(port: int):
+    """api_version of a CardioLens server already on this port, 0 if it predates versioning, None if not CardioLens."""
+    try:
+        with urllib.request.urlopen(f"http://{HOST}:{port}/api/health", timeout=2) as r:
+            return json.loads(r.read()).get("api_version", 0)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def start_api(port: int, reload: bool = False) -> subprocess.Popen:
     if port_in_use(port):
-        raise RuntimeError(f"Port {port} is already in use — is CardioLens already running? "
-                           f"Stop it, or start on another port with --port.")
+        version = running_cardiolens(port)
+        stop_hint = (f"Stop it first: press Ctrl+C in the terminal where it runs, or close that terminal"
+                     + ("" if os.name == "nt" else f" (or run: lsof -ti tcp:{port} | xargs kill)") + ".")
+        if version is None:
+            raise RuntimeError(f"Port {port} is used by another program. Start CardioLens on another port, "
+                               f"e.g. python3 Main.py --port {port + 1}.")
+        raise RuntimeError(f"CardioLens is already running on port {port}"
+                           + (" — an OLDER version, so new features (e.g. doctor sign-in) won't work. "
+                              if version < API_VERSION else ". ")
+                           + stop_hint + " Then run python3 Main.py again.")
     cmd = [sys.executable, "-m", "uvicorn", "backend.app:app", "--host", HOST, "--port", str(port)]
     if reload:
         cmd += ["--reload", "--reload-dir", "backend", "--reload-dir", "ml"]

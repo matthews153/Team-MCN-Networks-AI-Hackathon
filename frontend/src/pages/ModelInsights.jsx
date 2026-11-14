@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { AlertTriangle, BrainCircuit, Database, Scale, Target, TrendingUp } from 'lucide-react'
+import { AlertTriangle, BrainCircuit, Database, Ruler, Scale, Target, TrendingUp } from 'lucide-react'
 import { api, CLASSES, CLASS_COLORS, CLASS_NAMES, CLASS_SHORT, navigate, num, pct } from '../lib'
 import { axisProps, Card, ChartTip, ClassTag, ErrorState, gridProps, Kpi, Legend } from '../components/ui'
 
@@ -116,6 +116,35 @@ export default function ModelInsights() {
           })}</tbody>
         </table>
       </Card>
+
+      {m.lvh_voltage && (() => {
+        const V = m.lvh_voltage
+        const rows = [
+          { name: 'AI alone', d: V.ai, note: `threshold ${num(V.threshold, 2)}` },
+          { name: 'Voltage criteria alone (Sokolow-Lyon or Cornell)', d: V.voltage_met, note: 'classic clinical rule — a baseline' },
+          { name: 'AI + voltage criteria met', d: V.ai_or_met, note: 'shown as a prompt on the case page' },
+          { name: 'AI + voltage met or borderline', d: V.ai_or_borderline, note: 'borderline = within 10% of a cut-off (also shown on the case page)' },
+        ]
+        return (
+          <Card title="Hypertrophy safety net: voltage criteria" icon={<Ruler size={16} color="var(--accent)" />} style={{ marginBottom: 16 }}
+            sub={`Hypertrophy is the category the AI misses most. CardioLens also measures the classic LVH voltage rules on every ECG. Test set: ${V.n_hyp} hypertrophy ECGs out of ${V.n_test.toLocaleString()}.`}>
+            <table className="table">
+              <thead><tr><th>Approach</th><th className="num">Hypertrophy caught</th><th className="num">Flags that are right (PPV)</th><th className="num">Missed</th><th className="num">False alarms</th><th>Note</th></tr></thead>
+              <tbody>{rows.map((r) => (
+                <tr key={r.name}><td>{r.name}</td><td className="num">{pct(r.d.sensitivity, 1)}</td><td className="num">{pct(r.d.ppv, 1)}</td>
+                  <td className="num" style={{ color: 'var(--critical)', fontWeight: 600 }}>{r.d.fn}</td><td className="num" style={{ color: 'var(--warning)', fontWeight: 600 }}>{r.d.fp}</td>
+                  <td className="muted small">{r.note}</td></tr>
+              ))}</tbody>
+            </table>
+            <p className="small text-2" style={{ margin: '10px 0 0', lineHeight: 1.5 }}>
+              Of the {V.ai_misses} hypertrophy ECGs the AI misses, {V.ai_misses_met} meet voltage criteria and {V.ai_misses_borderline} more are borderline.
+              The price: {V.extra_alarms_met} ECGs without hypertrophy also meet the criteria ({V.extra_alarms_borderline} more are borderline) — so only about
+              1 in {Math.round((V.ai_misses_met + V.extra_alarms_met) / Math.max(1, V.ai_misses_met))} voltage flags the AI didn't make is real hypertrophy.
+              The AI alone beats the voltage rules on both catch rate and precision; the check is a prompt to double-check, not a diagnosis.
+            </p>
+          </Card>
+        )
+      })()}
 
       <div className="section-heading"><h3>Discrimination and error profile</h3></div>
       <div className="grid g-2" style={{ marginBottom: 16 }}>

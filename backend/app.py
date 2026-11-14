@@ -48,6 +48,38 @@ def _tag_demo(c: dict) -> dict:
 for _c in CASES.values():
     _tag_demo(_c)
 
+
+def _backfill_voltage() -> int:
+    """Cases analysed before the LVH voltage check existed get it computed from their stored signal."""
+    from .inference import _num, add_voltage_note
+    from ml.voltage import lvh_voltage
+    n = 0
+    for c in CASES.values():
+        r = c.get("result") or {}
+        v = r.get("lvh_voltage")
+        lv = getattr(engine, "metrics", {}).get("lvh_voltage") if engine.ready else None
+        if v and lv and "test_hit_rate" not in v and v.get("status") in ("met", "borderline") \
+                and "HYP" not in r.get("flagged", []):
+            hits, alarms = lv[f"ai_misses_{v['status']}"], lv[f"extra_alarms_{v['status']}"]
+            v["test_hit_rate"] = {"hits": hits, "total": hits + alarms}
+            n += 1
+        if v or not r.get("signal"):
+            continue
+        try:
+            x = np.asarray(r["signal"], dtype=np.float32).T            # (1000, 12) mV
+            p = c.get("patient") or {}
+            r["lvh_voltage"] = lvh_voltage(x, p.get("sex"), _num(p.get("age")), r.get("rhythm", {}).get("r_peaks"))
+            v, lv = r["lvh_voltage"], (engine.metrics.get("lvh_voltage") if engine.ready else None)
+            if lv and v.get("status") in ("met", "borderline") and "HYP" not in r.get("flagged", []):
+                hits, alarms = lv[f"ai_misses_{v['status']}"], lv[f"extra_alarms_{v['status']}"]
+                v["test_hit_rate"] = {"hits": hits, "total": hits + alarms}
+            add_voltage_note(r["triage"], r["lvh_voltage"], r.get("flagged", []))
+            n += 1
+        except Exception:  # noqa: BLE001 — never block startup on an old case
+            continue
+    return n
+
+
 SNAPSHOT_DIR = DATA_DIR / "snapshots"
 DOCTORS_FILE = DATA_DIR / "doctors.json"
 
@@ -73,6 +105,10 @@ def _save():
     CASES_FILE.write_text(json.dumps(list(CASES.values())))
 
 
+if _backfill_voltage():
+    _save()
+
+
 def _summary(c: dict) -> dict:
     r = c["result"]
     return {
@@ -85,6 +121,7 @@ def _summary(c: dict) -> dict:
         "probs": {f["code"]: f["probability"] for f in r["findings"]},
         "uncertain": r["uncertain"], "ground_truth": c.get("ground_truth"),
         "uploaded_by": c.get("uploaded_by"),
+        "lvh_voltage": (r.get("lvh_voltage") or {}).get("status"),
     }
 
 
@@ -121,10 +158,15 @@ def _load_samples():
 
 
 # --------------------------------------------------------------------------- #
+# Bump when the API gains or changes endpoints; the dashboard checks it (frontend/src/lib.js)
+# so an old server process left running after a `git pull` is reported clearly.
+API_VERSION = 4
+
+
 @app.get("/api/health")
 def health():
-    return {"ok": True, "model_ready": engine.ready, "ensemble_size": len(engine.models),
-            "classes": CLASSES, "class_info": CLASS_INFO}
+    return {"ok": True, "api_version": API_VERSION, "model_ready": engine.ready,
+            "ensemble_size": len(engine.models), "classes": CLASSES, "class_info": CLASS_INFO}
 
 
 @app.post("/api/reload")
@@ -278,9 +320,63 @@ def add_doctor(d: DoctorIn):
         if existing:
             return {"name": existing, "created": False}
         names.append(name)
-        DATA_DIR.mkdir(exist_ok=True)
-        DOCTORS_FILE.write_text(json.dumps(names))
+        _save_doctors(names)
     return {"name": name, "created": True}
+
+
+def _save_doctors(names: list[str]) -> None:
+    DATA_DIR.mkdir(exist_ok=True)
+    DOCTORS_FILE.write_text(json.dumps(names))
+
+
+def _find_doctor(names: list[str], name: str) -> int:
+    i = next((k for k, n in enumerate(names) if n.lower() == " ".join(name.split()).lower()), None)
+    if i is None:
+        raise HTTPException(404, f"No doctor named '{name}'")
+    return i
+
+
+class DoctorRename(BaseModel):
+    name: str
+    new_name: str
+
+
+@app.patch("/api/doctors")
+def rename_doctor(d: DoctorRename):
+    """Rename a doctor. Their name is updated on every case they uploaded or reviewed."""
+    new = " ".join(d.new_name.split())[:60]
+    if not new:
+        raise HTTPException(400, "Enter a name")
+    with _lock:
+        names = _load_doctors()
+        i = _find_doctor(names, d.name)
+        old = names[i]
+        if any(n.lower() == new.lower() for k, n in enumerate(names) if k != i):
+            raise HTTPException(409, f"'{new}' is already taken")
+        names[i] = new
+        _save_doctors(names)
+        changed = 0
+        for c in CASES.values():
+            if c.get("uploaded_by") == old:
+                c["uploaded_by"] = new
+                changed += 1
+            if (c.get("review") or {}).get("reviewed_by") == old:
+                c["review"]["reviewed_by"] = new
+                changed += 1
+        if changed:
+            _save()
+    return {"name": new, "old_name": old, "cases_updated": changed}
+
+
+@app.delete("/api/doctors")
+def delete_doctor(name: str):
+    """Remove a doctor from the sign-in list. Past cases keep their name as the record
+    of who uploaded or reviewed them."""
+    with _lock:
+        names = _load_doctors()
+        removed = names.pop(_find_doctor(names, name))
+        _save_doctors(names)
+    return {"ok": True, "name": removed}
 
 
 @app.get("/api/facilities")
@@ -408,6 +504,12 @@ def seed_demo(n: int = 24):
     with _lock:
         _save()
     return {"ok": True, "count": len(picks)}
+
+
+@app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+def unknown_api(path: str):
+    raise HTTPException(404, f"Unknown API endpoint /api/{path}. If you just updated CardioLens, "
+                             "restart the server (Ctrl+C, then python3 Main.py).")
 
 
 # --------------------------------------------------------------------------- #

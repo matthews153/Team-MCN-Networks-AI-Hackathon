@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertCircle, AlertTriangle, Ban, ChevronRight, Info, Mic, MicOff, FileUp, FlaskConical, Play, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
+import { AlertCircle, AlertTriangle, Ban, ChevronRight, EyeOff, Info, Mic, MicOff, FileUp, FlaskConical, Play, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
 import { api, CLASSES, SYMPTOMS, fmtDate, navigate } from '../lib'
 import { applyDictation, readDemographics, useDictation } from '../patientInput'
 import { Card, ClassTag, ErrorState, Findings, TriageBadge } from '../components/ui'
@@ -167,20 +167,6 @@ export default function Analyze({ health, demo, onDone }) {
       <div className="grid g-3" style={{ marginBottom: 16 }}>
         <Card title="Patient context" sub="Optional — symptoms raise review priority. Use anonymised IDs only.">
           <div className="grid" style={{ gap: 12 }}>
-            {dictation.supported && (
-              <button type="button" className={`btn dictate-btn ${dictation.listening ? 'recording' : ''}`} onClick={dictation.toggle}
-                title="Speak the patient's details, e.g. “62-year-old man with chest pain and dizziness”. In Chrome, speech is transcribed by Google — don't say identifiable details.">
-                {dictation.listening ? <><MicOff size={15} /> Stop</> : <><Mic size={15} /> Dictate</>}
-              </button>
-            )}
-            {dictation.listening && (
-              <div className="dictation-live" role="status">
-                <span className="rec-dot" aria-hidden="true" /> Listening… {dictation.interim
-                  ? <em>“{dictation.interim}”</em>
-                  : <span className="muted">say age, sex, symptoms and anything else for the notes</span>}
-              </div>
-            )}
-            {dictation.error && <div className="autofill-note warn" role="status"><AlertTriangle size={14} /><span>{dictation.error}</span></div>}
             {autofill && (
               <div className="autofill-note" role="status">
                 <Info size={14} aria-hidden="true" /><span>{autofill}</span>
@@ -210,7 +196,27 @@ export default function Analyze({ health, demo, onDone }) {
                 value={patient.facility} onChange={(e) => set('facility', e.target.value)} autoComplete="off" />
               <datalist id="facility-options">{facilities.map((f) => <option key={f} value={f} />)}</datalist>
             </label>
-            <label className="field">Clinical notes<textarea className="input" rows={2} value={patient.notes} onChange={(e) => set('notes', e.target.value)} /></label>
+            <div className="field">
+              <div className="notes-head">
+                <label htmlFor="clinical-notes">Clinical notes</label>
+                {dictation.supported && (
+                  <button type="button" className={`btn sm ${dictation.listening ? 'recording' : ''}`} onClick={dictation.toggle}
+                    title="Speak your notes. Age, sex and symptoms you mention (e.g. “62-year-old man with chest pain”) are also filled in above. In Chrome, speech is transcribed by Google — don't say identifiable details.">
+                    {dictation.listening ? <><MicOff size={14} /> Stop</> : <><Mic size={14} /> Dictate</>}
+                  </button>
+                )}
+              </div>
+              <textarea id="clinical-notes" className="input" rows={3} value={patient.notes} onChange={(e) => set('notes', e.target.value)}
+                placeholder={dictation.supported ? 'Type, or press Dictate and speak' : undefined} />
+              {dictation.listening && (
+                <div className="dictation-live" role="status">
+                  <span className="rec-dot" aria-hidden="true" /> Listening… {dictation.interim
+                    ? <em>“{dictation.interim}”</em>
+                    : <span className="muted">age, sex and symptoms you mention are filled in above</span>}
+                </div>
+              )}
+              {dictation.error && <div className="autofill-note warn" role="status"><AlertTriangle size={14} /><span>{dictation.error}</span></div>}
+            </div>
           </div>
         </Card>
 
@@ -312,7 +318,7 @@ export default function Analyze({ health, demo, onDone }) {
         <div className="demo-hidden-note">
           <FlaskConical size={15} aria-hidden="true" />
           <span>The demo library of PTB-XL test ECGs is hidden while <strong>Demo data</strong> is off.</span>
-          <button className="btn sm" onClick={() => demo.setShow(true)} title="Also shows demo cases on the dashboard and in the queue">Turn demo data on</button>
+          <button className="btn sm" onClick={() => demo.setShow(true)} title="Same as switching Demo data on in the sidebar — also shows demo cases on the dashboard and in the queue">Show demo library</button>
         </div>
       ) : (
       <Card title="Demo library — unseen PTB-XL test ECGs" icon={<FlaskConical size={16} color="var(--accent)" />}
@@ -323,6 +329,12 @@ export default function Analyze({ health, demo, onDone }) {
               <button type="button" key={c} className={`chip ${filter === c ? 'on' : ''}`} aria-pressed={filter === c}
                 onClick={() => setFilter(c)}>{c === 'ALL' ? 'All' : c === 'FAIL' ? 'Known failures' : c}</button>
             ))}
+            {demo && (
+              <button type="button" className="btn sm hide-library" onClick={() => demo.setShow(false)}
+                title="Same as switching Demo data off in the sidebar — also hides demo cases on the dashboard and in the queue">
+                <EyeOff size={13} /> Hide demo library
+              </button>
+            )}
           </div>
         }>
         {shown.length === 0 ? <div className="empty">No records match this filter.</div> : (

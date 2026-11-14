@@ -53,6 +53,11 @@ python3 cases.py restore before_demo --replace     # replace the current cases e
 
 These commands work whether or not CardioLens is running. If it is, the dashboard updates straight away.
 
+### Troubleshooting
+* **"The CardioLens server is out of date" or "Method Not Allowed" after a `git pull`:** an old server process is still running. The dashboard updated, but the server's code didn't. Stop it with Ctrl+C in its terminal (or close that terminal, or on macOS/Linux run `lsof -ti tcp:8000 | xargs kill`), then run `python3 Main.py` again.
+* **"Port 8000 is used by another program":** run `python3 Main.py --port 8001`.
+* When you add or change API endpoints, bump `API_VERSION` in `backend/app.py` and `REQUIRED_API` in `frontend/src/lib.js`.
+
 ### Retraining from scratch
 
 ```bash
@@ -115,19 +120,24 @@ unzip ptbxl.zip && rm ptbxl.zip && cd ..
    | Model | Macro AUROC | Macro F1 | Normal-vs-abnormal accuracy |
    |---|---|---|---|
    | Prevalence guess | 0.500 | 0.00 | 57.7% (always "abnormal") |
-   | Logistic regression on hand-crafted features | 0.854 | 0.65 | 79.1% |
-   | Single 1D-ResNet | 0.928 | 0.75 | — |
-   | **CardioLens ensemble (3 × ResNet)** | **0.931** | **0.76** | **87.0%** |
+   | Logistic regression on hand-crafted features | 0.854 | 0.65 | 79.3% |
+   | Single 1D-ResNet | 0.930 | 0.75 | — |
+   | **CardioLens ensemble (3 × ResNet)** | **0.933** | **0.76** | **87.2%** |
 
-   Normal vs abnormal, reported separately: **85.2% sensitivity** (185 abnormal ECGs missed, i.e. false negatives) and **89.6% specificity** (95 normal ECGs falsely flagged, i.e. false positives).
-   Per class, sensitivity / PPV: MI 81% / 71%, STTC 79% / 79%, CD 72% / 82%, HYP 60% / 62%.
-   Fairness: macro AUROC is 0.941 for men and 0.921 for women. The weakest group is under-40s: only 46% of their abnormal ECGs are kept out of the "Normal" class, and MI sensitivity falls to 57%. Young patients with disease are the most likely to be missed.
+   Normal vs abnormal, reported separately: **86.4% sensitivity** (169 abnormal ECGs missed, i.e. false negatives) and **88.3% specificity** (107 normal ECGs falsely flagged, i.e. false positives).
+   Per class, sensitivity / PPV: MI 79% / 73%, STTC 81% / 77%, CD 76% / 80%, HYP 73% / 55%. Hypertrophy uses a lowered threshold (0.20) on purpose: it catches more cases at the cost of more false alarms.
+   Fairness: macro AUROC is 0.943 for men and 0.923 for women. The weakest group is under-40s: only 50% of their abnormal ECGs are kept out of the "Normal" class, and MI sensitivity falls to 57%. Young patients with disease are the most likely to be missed.
+
+   Hypertrophy safety net: every ECG is also checked against the classic LVH voltage criteria (Sokolow-Lyon, sex-specific Cornell; `ml/voltage.py`). On the test set the voltage rules alone catch 51% of hypertrophy with 42% PPV, which is worse than the AI's 73% / 55%. Used as a safety net next to the AI, they raise hypertrophy detection to 77%, at the cost of 113 extra flags: only about 1 in 13 voltage flags the AI didn't make is real hypertrophy. The case page shows the measured values and this hit rate. Reproduce with `python -m ml.eval_voltage`.
+
+   After changing a decision threshold in `artifacts/metrics.json`, run `python -m ml.recompute_metrics` (or `python -m ml.recompute_metrics --set HYP=0.2`) to refresh every threshold-dependent number without retraining.
 4. **Where does it fail?** See the *Hardest test cases* table and the failure chart. Typical failures: subtle or old MI read as normal; multi-label ECGs where only one finding is caught; hypertrophy (rarest class, lowest PPV); the youngest age group, which has few abnormal training examples.
 
 **Make it our own:** a specific clinical user and workflow (remote ECG triage queue), uncertainty from ensemble disagreement, signal-quality gating, explainability overlays, and a subgroup fairness audit.
 
 ### Limitations
 * PTB-XL labels describe ECG findings, not urgency or outcomes, so the priority rule is a transparent heuristic, not a validated risk model.
+* Voltage criteria are a rule of thumb: they miss many cases of hypertrophy, and healthy young, thin or athletic people can meet them.
 * Data comes from a single German source (1989–1996), so generalisation to other devices and populations is untested.
 * Photos and scans of paper ECGs are not supported yet; only digital waveforms are.
 

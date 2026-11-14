@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AlertCircle, BrainCircuit, FlaskConical, Info, LogOut, ShieldAlert, UserRound, LayoutDashboard, ListChecks, Menu, Upload, X } from 'lucide-react'
-import { api, getDoctor, setDoctor } from './lib'
+import { api, getDoctor, serverOutdated, setDoctor } from './lib'
 import SignIn from './pages/SignIn'
+import OutdatedServer from './components/OutdatedServer'
 import Dashboard from './pages/Dashboard'
 import Analyze from './pages/Analyze'
 import Queue from './pages/Queue'
@@ -51,8 +52,11 @@ export default function App() {
 
   const refresh = useCallback(async () => {
     try {
-      const [h, c] = await Promise.all([api.health(), api.cases()])
+      const [h, c, docs] = await Promise.all([api.health(), api.cases(), api.doctors().catch(() => null)])
       setHealth(h); setCases(c); setError(null)
+      // signed-in name was renamed or removed (e.g. from another browser): back to sign-in
+      const me = getDoctor().toLowerCase()
+      if (docs && me && !docs.some((d) => d.name.toLowerCase() === me)) { setDoctor(''); setDoctorState('') }
     } catch (e) { setHealth(null); setError(e.message) }
   }, [])
   useEffect(() => { refresh() }, [refresh, hash])
@@ -65,7 +69,7 @@ export default function App() {
   const activeNav = NAV.find((n) => n.hash === '#/' ? hash === '#/' || hash === '' : hash.startsWith(n.hash))
   const mobileTitle = caseMatch ? 'Case review' : activeNav?.label || 'Dashboard'
 
-  if (!doctor) return <SignIn onSignIn={signIn} />
+  if (!doctor) return <SignIn onSignIn={signIn} outdated={serverOutdated(health)} />
 
   let page
   if (caseMatch) page = <CaseDetail id={caseMatch[1]} onChange={refresh} />
@@ -140,6 +144,7 @@ export default function App() {
           </button>
           <span>CardioLens <span className="mobile-bar-divider">/</span> {mobileTitle}</span>
         </div>
+        {serverOutdated(health) && <OutdatedServer />}
         {error && <div className="connection-alert" role="status">
           <AlertCircle size={17} aria-hidden="true" />
           <div>
