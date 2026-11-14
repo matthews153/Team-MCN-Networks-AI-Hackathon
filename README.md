@@ -147,3 +147,6 @@ unzip ptbxl.zip && rm ptbxl.zip && cd ..
 * Wagner et al. (2020). PTB-XL, a large publicly available electrocardiography dataset. *Scientific Data* 7, 154.
 * Goldberger et al. (2000). PhysioBank, PhysioToolkit, and PhysioNet. *Circulation* 101(23).
 * Libraries: PyTorch, scikit-learn, SciPy, wfdb, FastAPI, React, Recharts, lucide-react. AI coding assistants (Claude, ChatGPT) were used during development.
+
+
+https://github.com/matthews153/Team-MCN-Networks-AI-Hackathon.git
