@@ -84,9 +84,11 @@ export default function ECGViewer({
           const yTop = 2 + li * rowH
           const yMid = yTop + rowH / 2
           return (
-            <g key={name} className="lead-hit" onClick={() => onSelect?.(name)}>
+            <g key={name} className="lead-hit" role="button" tabIndex={0} aria-label={`Select lead ${name}`}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(name) } }}
+              onClick={() => onSelect?.(name)}>
               <rect className="hover-bg" x={0} y={yTop} width={W} height={rowH}
-                fill={selected === name ? 'rgba(56,189,248,.08)' : 'transparent'} />
+                fill={selected === name ? 'rgba(69,184,200,.08)' : 'transparent'} />
               {heatRects(sal?.[li], 0, n, LEFT, yTop, rowH, fs)}
               <CalPulse x={1} yMid={yMid + 4} />
               {leadLabel(name, 1, yTop + 3.6)}
@@ -116,9 +118,11 @@ export default function ECGViewer({
         const x0 = LEFT + c * colW
         const i0 = c * seg
         return (
-          <g key={name} className="lead-hit" onClick={() => onSelect?.(name)}>
+          <g key={name} className="lead-hit" role="button" tabIndex={0} aria-label={`Select lead ${name}`}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(name) } }}
+            onClick={() => onSelect?.(name)}>
             <rect className="hover-bg" x={x0} y={yTop} width={colW} height={rowH}
-              fill={selected === name ? 'rgba(56,189,248,.08)' : 'transparent'} />
+              fill={selected === name ? 'rgba(69,184,200,.08)' : 'transparent'} />
             {heatRects(sal?.[li], i0, i0 + seg, x0, yTop, rowH, fs)}
             {c === 0 && <CalPulse x={1} yMid={yMid + 4} />}
             {c > 0 && <line x1={x0} x2={x0} y1={yMid - 3} y2={yMid + 3} stroke="#9aa4b2" strokeWidth="0.3" />}
@@ -133,12 +137,14 @@ export default function ECGViewer({
         const yTop = 2 + 3 * rowH
         const yMid = yTop + rowH / 2 + 1
         return (
-          <g className="lead-hit" onClick={() => onSelect?.('II')}>
+          <g className="lead-hit" role="button" tabIndex={0} aria-label="Select lead II rhythm strip"
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.('II') } }}
+            onClick={() => onSelect?.('II')}>
             {heatRects(sal?.[li], 0, n, LEFT, yTop, rowH, fs)}
             <CalPulse x={1} yMid={yMid + 4} />
             {leadLabel('II (rhythm)', LEFT + 1, yTop + 4)}
             {rPeaks.map((p) => (
-              <path key={p} d={`M${LEFT + (p * MM_PER_S) / fs},${yTop + 1.5} l-1,-1.5 h2 z`} fill="#38bdf8" />
+              <path key={p} d={`M${LEFT + (p * MM_PER_S) / fs},${yTop + 1.5} l-1,-1.5 h2 z`} fill="#45b8c8" />
             ))}
             <path d={tracePath(signal[li], 0, n, LEFT, yMid, fs, rowH * 0.6)} fill="none"
               stroke="#e8edf5" strokeWidth="0.32" strokeLinejoin="round" />
@@ -164,7 +170,7 @@ export function LeadDetail({ signal, saliency, lead, fs = 100, rPeaks = [] }) {
       {heatRects(saliency?.[li], 0, n, 2, 0, H - 5, fs, 3)}
       {rPeaks.map((p) => (
         <line key={p} x1={2 + (p * MM_PER_S) / fs} x2={2 + (p * MM_PER_S) / fs} y1={2} y2={H - 6}
-          stroke="#38bdf8" strokeWidth="0.15" strokeDasharray="0.8 0.8" />
+          stroke="#45b8c8" strokeWidth="0.15" strokeDasharray="0.8 0.8" />
       ))}
       <path d={tracePath(s, 0, n, 2, yMid, fs, H * 0.45)} fill="none" stroke="#f1f5f9" strokeWidth="0.35" />
       {Array.from({ length: 11 }, (_, k) => (

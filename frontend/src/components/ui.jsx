@@ -1,13 +1,26 @@
-import { AlertOctagon, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { AlertCircle, AlertOctagon, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { CLASS_COLORS, CLASS_SHORT, TRIAGE } from '../lib'
+
+export function ErrorState({ title, message, detail }) {
+  return (
+    <div className="inline-error" role="alert">
+      <AlertCircle size={17} aria-hidden="true" />
+      <div>
+        <strong>{title}</strong>
+        <p>{message}</p>
+        {detail && <details><summary>Technical details</summary><span>{detail}</span></details>}
+      </div>
+    </div>
+  )
+}
 
 export function Card({ title, sub, icon, right, children, className = '', style }) {
   return (
     <div className={`card ${className}`} style={style}>
       {(title || right) && (
-        <div className="row between" style={{ alignItems: 'flex-start' }}>
-          <div>
-            {title && <h3>{icon}{title}</h3>}
+        <div className="card-header row between">
+          <div className="card-heading">
+            {title && <h3>{icon && <span className="card-icon">{icon}</span>}{title}</h3>}
             {sub && <p className="sub">{sub}</p>}
           </div>
           {right}
@@ -18,13 +31,12 @@ export function Card({ title, sub, icon, right, children, className = '', style 
   )
 }
 
-export function Kpi({ label, value, hint, icon, color = 'var(--accent)' }) {
+export function Kpi({ label, value, hint, icon }) {
   return (
-    <div className="card kpi">
-      <div className="label">{label}</div>
+    <div className="kpi">
+      <div className="label">{icon && <span className="kpi-icon">{icon}</span>}{label}</div>
       <div className="value">{value}</div>
       {hint && <div className="hint">{hint}</div>}
-      {icon && <div className="icon-bg" style={{ color }}>{icon}</div>}
     </div>
   )
 }
@@ -93,6 +105,6 @@ export function Legend({ items, shape = 'rect' }) {
 }
 
 export const axisProps = {
-  stroke: 'var(--axis)', tick: { fill: '#8a909c', fontSize: 11 }, tickLine: false,
+  stroke: 'var(--axis)', tick: { fill: 'var(--muted)', fontSize: 11 }, tickLine: false,
 }
-export const gridProps = { stroke: '#2a2f3a', strokeDasharray: '0', vertical: false }
+export const gridProps = { stroke: 'var(--grid)', strokeDasharray: '0', vertical: false }

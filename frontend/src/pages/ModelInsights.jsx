@@ -4,9 +4,9 @@ import {
 } from 'recharts'
 import { AlertTriangle, BrainCircuit, Database, Scale, Target, TrendingUp } from 'lucide-react'
 import { api, CLASSES, CLASS_COLORS, CLASS_NAMES, CLASS_SHORT, navigate, num, pct } from '../lib'
-import { axisProps, Card, ChartTip, ClassTag, gridProps, Kpi, Legend } from '../components/ui'
+import { axisProps, Card, ChartTip, ClassTag, ErrorState, gridProps, Kpi, Legend } from '../components/ui'
 
-const SEQ = ['#86b6ef', '#3987e5', '#1c5cab', '#104281']
+const SEQ = ['#557f8b', '#84704d', '#527451', '#73628a']
 
 export default function ModelInsights() {
   const [m, setM] = useState(null)
@@ -36,13 +36,13 @@ export default function ModelInsights() {
     return { comp, errors, hist, lossHist, total, age }
   }, [m])
 
-  if (err) return <div className="empty">{err}</div>
+  if (err) return <ErrorState title="Model insights unavailable" message="Performance data could not be loaded from the CardioLens API." detail={err} />
   if (!m) return <div className="empty"><span className="spinner" /></div>
   const B = m.binary
   const sampleById = Object.fromEntries(samples.map((s) => [s.ecg_id, s]))
 
   return (
-    <div className="fade-in">
+    <div>
       <div className="page-head">
         <div>
           <h2>Model insights</h2>
@@ -50,26 +50,27 @@ export default function ModelInsights() {
         </div>
       </div>
 
-      <div className="grid g-6" style={{ marginBottom: 16 }}>
+      <div className="grid g-6 metric-grid" style={{ marginBottom: 16 }}>
         <Kpi label="Macro AUROC" value={num(m.ensemble.macro.auroc, 3)} hint={`vs ${num(m.baselines.logreg_features.macro.auroc, 3)} baseline`} icon={<Target size={18} />} />
-        <Kpi label="Abnormal sensitivity" value={pct(B.sensitivity, 1)} hint={`${B.confusion.fn} abnormal ECGs missed`} icon={<AlertTriangle size={18} />} color="var(--critical)" />
-        <Kpi label="Abnormal specificity" value={pct(B.specificity, 1)} hint={`${B.confusion.fp} false alarms`} icon={<Scale size={18} />} color="var(--warning)" />
-        <Kpi label="Normal-vs-abnormal accuracy" value={pct(B.accuracy, 1)} hint={`majority guess: ${pct(B.majority_baseline.accuracy, 1)}`} icon={<TrendingUp size={18} />} color="var(--good)" />
-        <Kpi label="Macro F1" value={num(m.ensemble.macro.f1, 3)} hint="thresholds tuned on fold 9" icon={<BrainCircuit size={18} />} color="var(--accent-2)" />
+        <Kpi label="Abnormal sensitivity" value={pct(B.sensitivity, 1)} hint={`${B.confusion.fn} abnormal ECGs missed`} icon={<AlertTriangle size={16} />} />
+        <Kpi label="Abnormal specificity" value={pct(B.specificity, 1)} hint={`${B.confusion.fp} false alarms`} icon={<Scale size={16} />} />
+        <Kpi label="Normal-vs-abnormal accuracy" value={pct(B.accuracy, 1)} hint={`majority guess: ${pct(B.majority_baseline.accuracy, 1)}`} icon={<TrendingUp size={16} />} />
+        <Kpi label="Macro F1" value={num(m.ensemble.macro.f1, 3)} hint="thresholds tuned on fold 9" icon={<BrainCircuit size={16} />} />
         <Kpi label="Training data" value={m.n.train.toLocaleString()} hint={`ECGs · ${m.ensemble_size} models × ${m.epochs} epochs`} icon={<Database size={18} />} />
       </div>
 
+      <div className="section-heading"><h3>Overall performance</h3></div>
       <div className="grid g-3" style={{ marginBottom: 16 }}>
-        <Card title="Does it beat a simple baseline?" sub="Macro AUROC on the test set (0.5 = coin flip)" className="span-2">
+        <Card title="Comparison with baselines" sub="Macro AUROC on the held-out test set (0.5 = chance)" className="span-2">
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={derived.comp} layout="vertical" margin={{ left: 20, right: 40 }}>
               <CartesianGrid {...gridProps} horizontal={false} vertical />
               <XAxis type="number" domain={[0, 1]} {...axisProps} />
               <YAxis type="category" dataKey="short" {...axisProps} width={130} />
-              <ReferenceLine x={0.5} stroke="#8a909c" strokeDasharray="4 3" />
-              <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} content={<ChartTip fmt={(v) => num(v, 3)} />} />
-              <Bar isAnimationActive={false} dataKey="auroc" name="Macro AUROC" radius={[0, 4, 4, 0]} barSize={22} label={{ position: 'right', fill: '#b6bcc8', fontSize: 11, formatter: (v) => num(v, 3) }}>
-                {derived.comp.map((c, i) => <Cell key={i} fill={i === 3 ? '#3987e5' : '#4b5363'} />)}
+              <ReferenceLine x={0.5} stroke="var(--axis)" strokeDasharray="4 3" />
+              <Tooltip cursor={{ fill: 'rgba(23,87,101,0.05)' }} content={<ChartTip fmt={(v) => num(v, 3)} />} />
+              <Bar isAnimationActive={false} dataKey="auroc" name="Macro AUROC" radius={[0, 4, 4, 0]} barSize={22} label={{ position: 'right', fill: 'var(--text-2)', fontSize: 11, formatter: (v) => num(v, 3) }}>
+                {derived.comp.map((c, i) => <Cell key={i} fill={i === 3 ? 'var(--accent)' : '#607680'} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -109,23 +110,24 @@ export default function ModelInsights() {
                 <td><ClassTag code={c} label={CLASS_NAMES[c]} /></td>
                 <td className="num">{e.n_pos}</td><td className="num">{num(e.auroc, 3)}</td><td className="num">{num(e.auprc, 3)}</td>
                 <td className="num">{pct(e.sensitivity, 1)}</td><td className="num">{pct(e.specificity, 1)}</td><td className="num">{pct(e.ppv, 1)}</td><td className="num">{num(e.f1, 3)}</td>
-                <td className="num" style={{ color: '#ff8b8b', fontWeight: 600 }}>{e.fn}</td><td className="num" style={{ color: '#ffcc5c', fontWeight: 600 }}>{e.fp}</td><td className="num muted">{num(e.threshold, 2)}</td>
+                <td className="num" style={{ color: 'var(--critical)', fontWeight: 600 }}>{e.fn}</td><td className="num" style={{ color: 'var(--warning)', fontWeight: 600 }}>{e.fp}</td><td className="num muted">{num(e.threshold, 2)}</td>
               </tr>
             )
           })}</tbody>
         </table>
       </Card>
 
+      <div className="section-heading"><h3>Discrimination and error profile</h3></div>
       <div className="grid g-2" style={{ marginBottom: 16 }}>
         <Card title={curve === 'roc' ? 'ROC curves' : 'Precision–recall curves'} sub={curve === 'roc' ? 'True-positive rate vs false-positive rate per category' : 'Precision vs recall — more informative for rarer categories like HYP'}
           right={<div className="seg"><button className={curve === 'roc' ? 'on' : ''} onClick={() => setCurve('roc')}>ROC</button><button className={curve === 'pr' ? 'on' : ''} onClick={() => setCurve('pr')}>PR</button></div>}>
           <Legend shape="line" items={CLASSES.map((c) => ({ label: `${CLASS_SHORT[c]} (${num(curve === 'roc' ? m.ensemble.per_class[c].auroc : m.ensemble.per_class[c].auprc, 2)})`, color: CLASS_COLORS[c] }))} />
           <ResponsiveContainer width="100%" height={300}>
             <LineChart margin={{ right: 10 }}>
-              <CartesianGrid stroke="#2a2f3a" />
-              <XAxis type="number" dataKey={curve === 'roc' ? 'fpr' : 'recall'} domain={[0, 1]} {...axisProps} label={{ value: curve === 'roc' ? 'False-positive rate' : 'Recall', fill: '#8a909c', fontSize: 11, position: 'insideBottom', offset: -2 }} />
+              <CartesianGrid stroke="var(--grid)" />
+              <XAxis type="number" dataKey={curve === 'roc' ? 'fpr' : 'recall'} domain={[0, 1]} {...axisProps} label={{ value: curve === 'roc' ? 'False-positive rate' : 'Recall', fill: 'var(--muted)', fontSize: 11, position: 'insideBottom', offset: -2 }} />
               <YAxis type="number" domain={[0, 1]} {...axisProps} width={34} />
-              {curve === 'roc' && <ReferenceLine segment={[{ x: 0, y: 0 }, { x: 1, y: 1 }]} stroke="#4b5363" strokeDasharray="4 3" />}
+              {curve === 'roc' && <ReferenceLine segment={[{ x: 0, y: 0 }, { x: 1, y: 1 }]} stroke="var(--axis)" strokeDasharray="4 3" />}
               <Tooltip content={<ChartTip fmt={(v) => num(v, 3)} labelFmt={(l) => `${curve === 'roc' ? 'FPR' : 'Recall'} ${num(l, 2)}`} />} />
               {CLASSES.map((c) => (
                 <Line key={c + curve} data={m.curves[c][curve]} dataKey={curve === 'roc' ? 'tpr' : 'precision'} name={CLASS_SHORT[c]} stroke={CLASS_COLORS[c]} strokeWidth={2} dot={false} isAnimationActive={false} />
@@ -133,18 +135,18 @@ export default function ModelInsights() {
             </LineChart>
           </ResponsiveContainer>
         </Card>
-        <Card title="Where does it fail?" sub="← missed cases (FN)  |  false alarms (FP) →  per category on the test set">
+        <Card title="False negatives and false positives" sub="Per-category test-set errors">
           <ResponsiveContainer width="100%" height={330}>
             <BarChart data={derived.errors} layout="vertical" stackOffset="sign" margin={{ left: 10, right: 30 }}>
               <CartesianGrid {...gridProps} horizontal={false} vertical />
               <XAxis type="number" {...axisProps} tickFormatter={(v) => Math.abs(v)} />
               <YAxis type="category" dataKey="name" {...axisProps} width={84} />
-              <ReferenceLine x={0} stroke="#8a909c" />
-              <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} content={<ChartTip fmt={(v) => Math.abs(v)} />} />
-              <Bar isAnimationActive={false} dataKey="missed" name="Missed (FN)" stackId="s" barSize={22} radius={[4, 0, 0, 4]} label={{ position: 'insideLeft', fill: '#fff', fontSize: 11, formatter: (v) => Math.abs(v) }}>
+              <ReferenceLine x={0} stroke="var(--axis)" />
+              <Tooltip cursor={{ fill: 'rgba(23,87,101,0.05)' }} content={<ChartTip fmt={(v) => Math.abs(v)} />} />
+              <Bar isAnimationActive={false} dataKey="missed" name="Missed (FN)" stackId="s" barSize={22} radius={[4, 0, 0, 4]} label={{ position: 'insideLeft', fill: '#172a33', fontSize: 11, formatter: (v) => Math.abs(v) }}>
                 {derived.errors.map((e) => <Cell key={e.code} fill={CLASS_COLORS[e.code]} />)}
               </Bar>
-              <Bar isAnimationActive={false} dataKey="false_alarms" name="False alarms (FP)" stackId="s" barSize={22} radius={[0, 4, 4, 0]} label={{ position: 'insideRight', fill: '#fff', fontSize: 11 }}>
+              <Bar isAnimationActive={false} dataKey="false_alarms" name="False alarms (FP)" stackId="s" barSize={22} radius={[0, 4, 4, 0]} label={{ position: 'insideRight', fill: '#172a33', fontSize: 11 }}>
                 {derived.errors.map((e) => <Cell key={e.code} fill={CLASS_COLORS[e.code]} fillOpacity={0.5} />)}
               </Bar>
             </BarChart>
@@ -152,6 +154,7 @@ export default function ModelInsights() {
         </Card>
       </div>
 
+      <div className="section-heading"><h3>Subgroup performance and calibration</h3></div>
       <div className="grid g-2" style={{ marginBottom: 16 }}>
         <Card title="Fairness across groups" sub="Macro AUROC and per-category sensitivity by sex and age band (test set)">
           <ResponsiveContainer width="100%" height={200}>
@@ -159,8 +162,8 @@ export default function ModelInsights() {
               <CartesianGrid {...gridProps} />
               <XAxis dataKey="group" {...axisProps} />
               <YAxis domain={[0.5, 1]} {...axisProps} width={34} />
-              <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} content={<ChartTip fmt={(v) => num(v, 3)} />} />
-              <Bar isAnimationActive={false} dataKey="macro_auroc" name="Macro AUROC" fill="#3987e5" radius={[4, 4, 0, 0]} barSize={30} label={{ position: 'top', fill: '#b6bcc8', fontSize: 10, formatter: (v) => num(v, 2) }} />
+              <Tooltip cursor={{ fill: 'rgba(23,87,101,0.05)' }} content={<ChartTip fmt={(v) => num(v, 3)} />} />
+              <Bar isAnimationActive={false} dataKey="macro_auroc" name="Macro AUROC" fill="var(--accent)" radius={[4, 4, 0, 0]} barSize={30} label={{ position: 'top', fill: 'var(--muted)', fontSize: 10, formatter: (v) => num(v, 2) }} />
             </BarChart>
           </ResponsiveContainer>
           <div className="small muted" style={{ margin: '6px 0 2px' }}>Sensitivity by category</div>
@@ -175,10 +178,10 @@ export default function ModelInsights() {
           <Legend shape="line" items={CLASSES.map((c) => ({ label: CLASS_SHORT[c], color: CLASS_COLORS[c] }))} />
           <ResponsiveContainer width="100%" height={330}>
             <LineChart margin={{ right: 10 }}>
-              <CartesianGrid stroke="#2a2f3a" />
-              <XAxis type="number" dataKey="predicted" domain={[0, 1]} {...axisProps} label={{ value: 'Predicted probability', fill: '#8a909c', fontSize: 11, position: 'insideBottom', offset: -2 }} />
+              <CartesianGrid stroke="var(--grid)" />
+              <XAxis type="number" dataKey="predicted" domain={[0, 1]} {...axisProps} label={{ value: 'Predicted probability', fill: 'var(--muted)', fontSize: 11, position: 'insideBottom', offset: -2 }} />
               <YAxis type="number" domain={[0, 1]} {...axisProps} width={34} />
-              <ReferenceLine segment={[{ x: 0, y: 0 }, { x: 1, y: 1 }]} stroke="#4b5363" strokeDasharray="4 3" />
+              <ReferenceLine segment={[{ x: 0, y: 0 }, { x: 1, y: 1 }]} stroke="var(--axis)" strokeDasharray="4 3" />
               <Tooltip content={<ChartTip fmt={(v) => num(v, 2)} labelFmt={(l) => `Predicted ${num(l, 2)}`} />} />
               {CLASSES.map((c) => (
                 <Line key={c} data={m.calibration[c]} dataKey="observed" name={CLASS_SHORT[c]} stroke={CLASS_COLORS[c]} strokeWidth={2} dot={{ r: 3, strokeWidth: 0, fill: CLASS_COLORS[c] }} isAnimationActive={false} />
@@ -188,6 +191,7 @@ export default function ModelInsights() {
         </Card>
       </div>
 
+      <div className="section-heading"><h3>Training and dataset</h3></div>
       <div className="grid g-3" style={{ marginBottom: 16 }}>
         <Card title="Training progress" sub="Validation macro AUROC per epoch, one line per ensemble member">
           <Legend shape="line" items={m.history.map((_, k) => ({ label: `Model ${k + 1}`, color: SEQ[k % SEQ.length] }))} />
@@ -207,7 +211,7 @@ export default function ModelInsights() {
               <CartesianGrid {...gridProps} />
               <XAxis dataKey="name" {...axisProps} />
               <YAxis {...axisProps} width={40} />
-              <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} content={<ChartTip fmt={(v) => `${v.toLocaleString()} ECGs`} />} />
+              <Tooltip cursor={{ fill: 'rgba(23,87,101,0.05)' }} content={<ChartTip fmt={(v) => `${v.toLocaleString()} ECGs`} />} />
               <Bar isAnimationActive={false} dataKey="n" name="ECGs" radius={[4, 4, 0, 0]}>{derived.total.map((t) => <Cell key={t.code} fill={CLASS_COLORS[t.code]} />)}</Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -222,7 +226,7 @@ export default function ModelInsights() {
               return [
                 <div key={r} className="small row">{CLASS_SHORT[r].slice(0, 8)}</div>,
                 ...row.map((v, j) => (
-                  <div key={r + j} className="heat-cell" style={{ height: 34, background: `rgba(57,135,229,${0.06 + 0.9 * Math.sqrt(v / mx)})` }}
+                  <div key={r + j} className="heat-cell" style={{ height: 34, background: `rgba(24,127,142,${0.06 + 0.75 * Math.sqrt(v / mx)})` }}
                     title={`${CLASS_NAMES[r]} & ${CLASS_NAMES[CLASSES[j]]}: ${v.toLocaleString()}`}>{v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v}</div>
                 )),
               ]
@@ -232,7 +236,8 @@ export default function ModelInsights() {
         </Card>
       </div>
 
-      <Card title="Hardest test cases" sub="ECGs where the model was most wrong — useful for the 'where does it fail?' write-up. PTB-XL reports are mostly in German.">
+      <div className="section-heading"><h3>Largest test-set errors</h3></div>
+      <Card title="Cases for inspection" sub="PTB-XL reports are mostly in German.">
         <table className="table">
           <thead><tr><th>ECG</th><th>Patient</th><th>Cardiologist label</th><th>AI prediction</th><th>Original report</th><th /></tr></thead>
           <tbody>{m.failures.slice(0, 12).map((f) => {
@@ -255,9 +260,8 @@ export default function ModelInsights() {
 }
 
 function Cm({ v, label, tone }) {
-  const col = { good: '12,163,12', critical: '208,59,59', warning: '250,178,25' }[tone]
   return (
-    <div style={{ background: `rgba(${col},0.12)`, border: `1px solid rgba(${col},0.4)`, borderRadius: 10, padding: '14px 8px', textAlign: 'center' }}>
+    <div className={`confusion-cell ${tone}`}>
       <div style={{ fontSize: 22, fontWeight: 650 }}>{v.toLocaleString()}</div>
       <div className="small text-2">{label}</div>
     </div>

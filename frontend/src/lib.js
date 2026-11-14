@@ -1,16 +1,18 @@
 // Shared API helpers, colours and formatting
 export const CLASSES = ['NORM', 'MI', 'STTC', 'CD', 'HYP']
-// Categorical slots in fixed order (validated for the dark card surface #161a22)
-export const CLASS_COLORS = { NORM: '#3987e5', MI: '#d95926', STTC: '#199e70', CD: '#c98500', HYP: '#d55181' }
+// Restrained category colors distinguish plotted series without encoding clinical severity.
+export const CLASS_COLORS = {
+  NORM: 'var(--c-norm)', MI: 'var(--c-mi)', STTC: 'var(--c-sttc)', CD: 'var(--c-cd)', HYP: 'var(--c-hyp)',
+}
 export const CLASS_NAMES = {
   NORM: 'Normal', MI: 'Myocardial infarction', STTC: 'ST/T change', CD: 'Conduction disturbance', HYP: 'Hypertrophy',
 }
 export const CLASS_SHORT = { NORM: 'Normal', MI: 'MI', STTC: 'ST/T', CD: 'Conduction', HYP: 'Hypertrophy' }
 // Status colours are reserved for triage level only
 export const TRIAGE = {
-  urgent: { color: '#d03b3b', label: 'Urgent', order: 0 },
-  priority: { color: '#fab219', label: 'Priority', order: 1 },
-  routine: { color: '#0ca30c', label: 'Routine', order: 2 },
+  urgent: { color: 'var(--critical)', label: 'Urgent', order: 0 },
+  priority: { color: 'var(--warning)', label: 'Priority', order: 1 },
+  routine: { color: 'var(--good)', label: 'Routine', order: 2 },
 }
 export const SYMPTOMS = ['chest pain', 'shortness of breath', 'palpitations', 'dizziness', 'syncope', 'fatigue']
 

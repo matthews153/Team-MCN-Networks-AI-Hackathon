@@ -32,7 +32,7 @@ export default function Queue({ cases, onChange }) {
   const clearAll = async () => { if (confirm('Delete ALL cases?')) { await api.clear(); onChange?.() } }
 
   return (
-    <div className="fade-in">
+    <div>
       <div className="page-head">
         <div>
           <h2>Review queue</h2>
@@ -44,23 +44,35 @@ export default function Queue({ cases, onChange }) {
         </div>
       </div>
 
-      <div className="row wrap" style={{ marginBottom: 14, gap: 10 }}>
-        <div className="seg">
-          {['pending', 'reviewed', 'all'].map((s) => <button key={s} className={status === s ? 'on' : ''} onClick={() => setStatus(s)}>{s[0].toUpperCase() + s.slice(1)}</button>)}
+      <div className="queue-filters">
+        <div className="filter-group">
+          <span className="filter-label">Review status</span>
+          <div className="seg">
+            {['pending', 'reviewed', 'all'].map((s) => <button key={s} className={status === s ? 'on' : ''} onClick={() => setStatus(s)}>{s[0].toUpperCase() + s.slice(1)}</button>)}
+          </div>
         </div>
-        <div className="seg">
-          {['all', 'urgent', 'priority', 'routine'].map((l) => <button key={l} className={level === l ? 'on' : ''} onClick={() => setLevel(l)}>{l === 'all' ? 'All levels' : TRIAGE[l].label}</button>)}
+        <div className="filter-group">
+          <span className="filter-label">Review priority</span>
+          <div className="seg">
+            {['all', 'urgent', 'priority', 'routine'].map((l) => <button key={l} className={level === l ? 'on' : ''} onClick={() => setLevel(l)}>{l === 'all' ? 'All levels' : TRIAGE[l].label}</button>)}
+          </div>
         </div>
-        <select className="input" style={{ width: 190 }} value={finding} onChange={(e) => setFinding(e.target.value)}>
-          <option value="all">All findings</option>
-          {CLASSES.map((c) => <option key={c} value={c}>{CLASS_SHORT[c]}</option>)}
-        </select>
-        <select className="input" style={{ width: 170 }} value={sort} onChange={(e) => setSort(e.target.value)}>
-          <option value="priority">Sort: priority</option><option value="newest">Sort: newest</option><option value="quality">Sort: worst quality</option>
-        </select>
-        <div className="row" style={{ position: 'relative', flex: 1, minWidth: 200 }}>
-          <Search size={14} style={{ position: 'absolute', left: 10 }} className="muted" />
-          <input className="input" style={{ paddingLeft: 30 }} placeholder="Search patient, facility, source…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <label className="filter-select">
+          <span className="filter-label">Finding</span>
+          <select className="input" value={finding} onChange={(e) => setFinding(e.target.value)}>
+            <option value="all">All findings</option>
+            {CLASSES.map((c) => <option key={c} value={c}>{CLASS_SHORT[c]}</option>)}
+          </select>
+        </label>
+        <label className="filter-select sort-select">
+          <span className="filter-label">Sort by</span>
+          <select className="input" value={sort} onChange={(e) => setSort(e.target.value)}>
+            <option value="priority">Review priority</option><option value="newest">Newest first</option><option value="quality">Lowest signal quality</option>
+          </select>
+        </label>
+        <div className="queue-search">
+          <Search size={14} aria-hidden="true" />
+          <input className="input" aria-label="Search patient, facility, or source" placeholder="Search patient, facility, source…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
       </div>
 
@@ -72,14 +84,16 @@ export default function Queue({ cases, onChange }) {
             </thead>
             <tbody>
               {rows.map((c) => (
-                <tr key={c.id} className="click" onClick={() => navigate(`#/case/${c.id}`)}>
+                <tr key={c.id} className="click" tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`#/case/${c.id}`) } }}
+                  onClick={() => navigate(`#/case/${c.id}`)}>
                   <td><TriageBadge level={c.triage.level} score={c.triage.score} /></td>
                   <td><strong>{c.patient?.patient_id || c.id}</strong><div className="muted small">{c.patient?.age ? `${Math.round(c.patient.age)}y` : ''} {c.patient?.sex || ''} {c.patient?.facility ? `· ${c.patient.facility}` : ''}</div></td>
                   <td><Findings flagged={c.flagged} category={c.category} />{c.uncertain.length > 0 && c.flagged.length > 0 && <div className="muted" style={{ fontSize: 11 }}>uncertain: {c.uncertain.join(', ')}</div>}</td>
                   <td><Spark probs={c.probs} /></td>
                   <td className="small text-2" style={{ maxWidth: 170 }}>{c.patient?.symptoms?.length ? c.patient.symptoms.join(', ') : '—'}</td>
                   <td className="num">{c.heart_rate ? Math.round(c.heart_rate) : '—'}</td>
-                  <td className="num" style={{ color: c.quality.grade === 'poor' ? '#ff8b8b' : undefined }}>{Math.round(c.quality.score)}</td>
+                  <td className="num" style={{ color: c.quality.grade === 'poor' ? 'var(--critical)' : undefined }}>{Math.round(c.quality.score)}</td>
                   <td>{c.review.status === 'reviewed'
                     ? <span className={`badge ${c.review.agrees ? 'routine' : 'priority'}`}>{c.review.agrees ? 'Agreed' : 'Overridden'}</span>
                     : <span className="badge neutral">Pending</span>}</td>

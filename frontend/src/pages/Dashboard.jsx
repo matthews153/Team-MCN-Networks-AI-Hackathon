@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import {
-  Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { Activity, AlertOctagon, Clock, Gauge, HeartPulse, Sparkles, Stethoscope, Upload, Users } from 'lucide-react'
+import { Activity, AlertOctagon, Clock, FlaskConical, Gauge, Stethoscope, Upload, Users } from 'lucide-react'
 import { api, CLASSES, CLASS_COLORS, CLASS_NAMES, CLASS_SHORT, TRIAGE, navigate, timeAgo } from '../lib'
 import { axisProps, Card, ChartTip, Findings, gridProps, Kpi, Legend, TriageBadge } from '../components/ui'
 
@@ -67,16 +67,17 @@ export default function Dashboard({ cases, health, onChange }) {
 
   if (!cases.length) {
     return (
-      <div className="fade-in">
+      <div>
         <Head />
-        <div className="card empty" style={{ padding: 70 }}>
-          <HeartPulse size={44} color="var(--accent)" />
-          <h3 style={{ justifyContent: 'center', fontSize: 18, marginTop: 14 }}>No ECGs analysed yet</h3>
-          <p className="muted">Upload a 12-lead ECG to get an AI interpretation, or load demo patients built from unseen PTB-XL test records.</p>
-          <div className="row" style={{ justifyContent: 'center', marginTop: 18 }}>
+        <div className="empty-workspace">
+          <div>
+            <h3>No ECGs analysed yet</h3>
+            <p>Upload a 12-lead ECG to start a review queue, or load cases built from unseen PTB-XL test records.</p>
+          </div>
+          <div className="row empty-actions">
             <button className="btn primary" onClick={() => navigate('#/analyze')}><Upload size={15} /> Analyse an ECG</button>
             <button className="btn" onClick={seed} disabled={seeding || !health?.model_ready}>
-              {seeding ? <span className="spinner" /> : <Sparkles size={15} />} Load demo cases
+              {seeding ? <span className="spinner" /> : <FlaskConical size={15} />} Load demo cases
             </button>
           </div>
         </div>
@@ -86,7 +87,7 @@ export default function Dashboard({ cases, health, onChange }) {
 
   const total = scoped.length
   return (
-    <div className="fade-in">
+    <div>
       <Head right={
         <div className="row">
           <div className="seg">
@@ -97,26 +98,28 @@ export default function Dashboard({ cases, health, onChange }) {
       } />
 
       {stats.urgentPending.length > 0 && (
-        <div className="triage-hero urgent row between" style={{ marginBottom: 16, cursor: 'pointer' }} onClick={() => navigate('#/queue')}>
+        <a href="#/queue" className="triage-hero urgent row between" style={{ marginBottom: 16, color: 'inherit' }}>
           <div className="row">
-            <AlertOctagon className="pulse" color="#ff8b8b" />
+            <AlertOctagon color="var(--critical)" />
             <div>
               <strong>{stats.urgentPending.length} urgent ECG{stats.urgentPending.length > 1 ? 's' : ''} awaiting your review</strong>
               <div className="small text-2">Flagged for possible MI or multiple co-existing abnormalities. Open the review queue →</div>
             </div>
           </div>
-        </div>
+        </a>
       )}
 
-      <div className="grid g-6" style={{ marginBottom: 16 }}>
+      <div className="section-heading"><h3>Current workload</h3></div>
+      <div className="grid g-6 metric-grid" style={{ marginBottom: 16 }}>
         <Kpi label="ECGs analysed" value={total} hint={`${stats.abnormal} abnormal (${total ? Math.round((stats.abnormal / total) * 100) : 0}%)`} icon={<Activity size={18} />} />
-        <Kpi label="Urgent, unreviewed" value={stats.urgentPending.length} hint="Needs immediate attention" icon={<AlertOctagon size={18} />} color="var(--critical)" />
-        <Kpi label="Awaiting review" value={stats.pending.length} hint={`${total - stats.pending.length} reviewed`} icon={<Users size={18} />} color="var(--warning)" />
-        <Kpi label="AI–clinician agreement" value={stats.agree == null ? '—' : `${Math.round(stats.agree * 100)}%`} hint={`${stats.reviewed.length} reviewed cases`} icon={<Stethoscope size={18} />} color="var(--good)" />
-        <Kpi label="Median time to review" value={stats.medTat == null ? '—' : stats.medTat < 60 ? `${Math.round(stats.medTat)}m` : `${(stats.medTat / 60).toFixed(1)}h`} hint="Upload → clinician sign-off" icon={<Clock size={18} />} color="var(--accent-2)" />
+        <Kpi label="Urgent, unreviewed" value={stats.urgentPending.length} hint="Needs immediate attention" icon={<AlertOctagon size={16} />} />
+        <Kpi label="Awaiting review" value={stats.pending.length} hint={`${total - stats.pending.length} reviewed`} icon={<Users size={16} />} />
+        <Kpi label="AI–clinician agreement" value={stats.agree == null ? '—' : `${Math.round(stats.agree * 100)}%`} hint={`${stats.reviewed.length} reviewed cases`} icon={<Stethoscope size={16} />} />
+        <Kpi label="Median time to review" value={stats.medTat == null ? '—' : stats.medTat < 60 ? `${Math.round(stats.medTat)}m` : `${(stats.medTat / 60).toFixed(1)}h`} hint="Upload → clinician sign-off" icon={<Clock size={16} />} />
         <Kpi label="Avg signal quality" value={stats.q == null ? '—' : Math.round(stats.q)} hint="0–100 heuristic score" icon={<Gauge size={18} />} />
       </div>
 
+      <div className="section-heading"><h3>Volume and priority</h3></div>
       <div className="grid g-3" style={{ marginBottom: 16 }}>
         <Card title="ECG volume by review priority" sub="Cases received per day, stacked by AI triage level" className="span-2">
           <Legend items={['urgent', 'priority', 'routine'].map((l) => ({ label: TRIAGE[l].label, color: TRIAGE[l].color }))} />
@@ -125,47 +128,46 @@ export default function Dashboard({ cases, health, onChange }) {
               <CartesianGrid {...gridProps} />
               <XAxis dataKey="day" {...axisProps} />
               <YAxis allowDecimals={false} {...axisProps} width={28} />
-              <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} content={<ChartTip />} />
+              <Tooltip cursor={{ fill: 'rgba(23,87,101,0.05)' }} content={<ChartTip />} />
               <Bar isAnimationActive={false} dataKey="routine" name="Routine" stackId="a" fill={TRIAGE.routine.color} stroke="var(--surface)" strokeWidth={2} />
               <Bar isAnimationActive={false} dataKey="priority" name="Priority" stackId="a" fill={TRIAGE.priority.color} stroke="var(--surface)" strokeWidth={2} />
               <Bar isAnimationActive={false} dataKey="urgent" name="Urgent" stackId="a" fill={TRIAGE.urgent.color} stroke="var(--surface)" strokeWidth={2} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
-        <Card title="Triage mix" sub="Share of cases by AI review priority">
-          <div style={{ position: 'relative' }}>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie isAnimationActive={false} data={stats.triage} dataKey="value" nameKey="name" innerRadius={62} outerRadius={88} paddingAngle={2} stroke="var(--surface)" strokeWidth={2}>
-                  {stats.triage.map((t) => <Cell key={t.level} fill={t.fill} />)}
-                </Pie>
-                <Tooltip content={<ChartTip fmt={(v) => `${v} cases`} />} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
-              <div style={{ textAlign: 'center' }}><div style={{ fontSize: 26, fontWeight: 650 }}>{total}</div><div className="muted small">cases</div></div>
-            </div>
+        <Card title="Cases by review priority" sub="Current selection · all review statuses">
+          <div className="priority-breakdown">
+            {stats.triage.map((t) => {
+              const share = total ? Math.round((t.value / total) * 100) : 0
+              return (
+                <div className="priority-row" key={t.level}>
+                  <TriageBadge level={t.level} />
+                  <div className="priority-track" role="meter" aria-label={`${t.name} share of cases`}
+                    aria-valuemin={0} aria-valuemax={100} aria-valuenow={share}>
+                    <span style={{ width: `${share}%`, background: t.fill }} />
+                  </div>
+                  <strong className="priority-count">{t.value}</strong>
+                  <span className="priority-percent">{share}%</span>
+                </div>
+              )
+            })}
           </div>
-          <div className="grid g-3" style={{ gap: 8 }}>
-            {stats.triage.map((t) => (
-              <div key={t.level} style={{ textAlign: 'center' }}>
-                <TriageBadge level={t.level} />
-                <div style={{ marginTop: 6, fontWeight: 600 }}>{t.value} <span className="muted small">({total ? Math.round((t.value / total) * 100) : 0}%)</span></div>
-              </div>
-            ))}
-          </div>
+          <div className="priority-total">{total.toLocaleString()} ECGs in this period</div>
         </Card>
       </div>
 
+      <div className="section-heading"><h3>Review queue</h3></div>
       <div className="grid g-3" style={{ marginBottom: 16 }}>
         <Card title="Urgent worklist" sub="Unreviewed cases, highest AI priority first" className="span-2"
           right={<button className="btn sm ghost" onClick={() => navigate('#/queue')}>Open queue →</button>}>
-          {stats.worklist.length === 0 ? <div className="empty">All caught up — no pending cases 🎉</div> : (
+          {stats.worklist.length === 0 ? <div className="empty">All caught up — no pending cases.</div> : (
             <table className="table">
               <thead><tr><th>Priority</th><th>Patient</th><th>AI findings</th><th>Symptoms</th><th className="num">HR</th><th>Received</th></tr></thead>
               <tbody>
                 {stats.worklist.map((c) => (
-                  <tr key={c.id} className="click" onClick={() => navigate(`#/case/${c.id}`)}>
+                  <tr key={c.id} className="click" tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`#/case/${c.id}`) } }}
+                    onClick={() => navigate(`#/case/${c.id}`)}>
                     <td><TriageBadge level={c.triage.level} score={c.triage.score} /></td>
                     <td><strong>{c.patient?.patient_id || '—'}</strong><div className="muted small">{c.patient?.age ? `${Math.round(c.patient.age)}y` : ''} {c.patient?.sex || ''}</div></td>
                     <td><Findings flagged={c.flagged} category={c.category} /></td>
@@ -178,14 +180,14 @@ export default function Dashboard({ cases, health, onChange }) {
             </table>
           )}
         </Card>
-        <Card title="AI findings" sub="Cases flagged per diagnostic category">
+        <Card title="Finding frequency" sub="Cases flagged per diagnostic category">
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={stats.findings} layout="vertical" margin={{ left: 10, right: 24 }}>
               <CartesianGrid {...gridProps} horizontal={false} vertical />
               <XAxis type="number" allowDecimals={false} {...axisProps} />
               <YAxis type="category" dataKey="name" {...axisProps} width={80} />
-              <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} content={<ChartTip fmt={(v) => `${v} cases`} />} />
-              <Bar isAnimationActive={false} dataKey="value" name="Cases" radius={[0, 4, 4, 0]} barSize={18} label={{ position: 'right', fill: '#b6bcc8', fontSize: 11 }}>
+              <Tooltip cursor={{ fill: 'rgba(23,87,101,0.05)' }} content={<ChartTip fmt={(v) => `${v} cases`} />} />
+              <Bar isAnimationActive={false} dataKey="value" name="Cases" radius={[0, 4, 4, 0]} barSize={18} label={{ position: 'right', fill: 'var(--text-2)', fontSize: 11 }}>
                 {stats.findings.map((f) => <Cell key={f.code} fill={CLASS_COLORS[f.code]} />)}
               </Bar>
             </BarChart>
@@ -193,15 +195,16 @@ export default function Dashboard({ cases, health, onChange }) {
         </Card>
       </div>
 
+      <div className="section-heading"><h3>Case distribution</h3></div>
       <div className="grid g-2">
-        <Card title="Abnormal findings by age group" sub="Who is being flagged — check the model behaves sensibly across ages">
+        <Card title="Flagged findings by age group" sub="Cases with one or more findings, grouped by age band">
           <Legend items={CLASSES.slice(1).map((c) => ({ label: CLASS_NAMES[c], color: CLASS_COLORS[c] }))} />
           <ResponsiveContainer width="100%" height={230}>
             <BarChart data={stats.byAge} barCategoryGap="30%">
               <CartesianGrid {...gridProps} />
               <XAxis dataKey="bin" {...axisProps} />
               <YAxis allowDecimals={false} {...axisProps} width={28} />
-              <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} content={<ChartTip labelFmt={(l) => `Age ${l}`} />} />
+              <Tooltip cursor={{ fill: 'rgba(23,87,101,0.05)' }} content={<ChartTip labelFmt={(l) => `Age ${l}`} />} />
               {CLASSES.slice(1).map((c) => (
                 <Bar isAnimationActive={false} key={c} dataKey={c} name={CLASS_SHORT[c]} fill={CLASS_COLORS[c]} radius={[4, 4, 0, 0]} />
               ))}
@@ -214,8 +217,8 @@ export default function Dashboard({ cases, health, onChange }) {
               <CartesianGrid {...gridProps} />
               <XAxis dataKey="bin" {...axisProps} interval={1} />
               <YAxis allowDecimals={false} {...axisProps} width={28} />
-              <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} content={<ChartTip fmt={(v) => `${v} cases`} labelFmt={(l) => `Score ${l}`} />} />
-              <Bar isAnimationActive={false} dataKey="n" name="Cases" fill="#3987e5" radius={[4, 4, 0, 0]} />
+              <Tooltip cursor={{ fill: 'rgba(23,87,101,0.05)' }} content={<ChartTip fmt={(v) => `${v} cases`} labelFmt={(l) => `Score ${l}`} />} />
+              <Bar isAnimationActive={false} dataKey="n" name="Cases" fill="var(--accent)" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
@@ -225,13 +228,11 @@ export default function Dashboard({ cases, health, onChange }) {
 }
 
 function Head({ right }) {
-  const h = new Date().getHours()
-  const greet = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
   return (
     <div className="page-head">
       <div>
-        <h2>{greet}, Doctor</h2>
-        <p>Here is your ECG triage overview. AI flags help you decide where to look first — every case still needs your read.</p>
+        <h2>ECG triage overview</h2>
+        <p>Review cases by AI-suggested priority. Every ECG still requires clinical interpretation.</p>
       </div>
       {right}
     </div>

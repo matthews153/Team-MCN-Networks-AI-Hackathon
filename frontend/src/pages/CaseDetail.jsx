@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import ECGViewer, { LeadDetail } from '../components/ECGViewer'
 import { api, CLASSES, CLASS_COLORS, CLASS_NAMES, CLASS_SHORT, fmtDate, navigate, pct } from '../lib'
-import { Card, ChartTip, ClassTag, TriageBadge } from '../components/ui'
+import { Card, ChartTip, ClassTag, ErrorState, TriageBadge } from '../components/ui'
 
 const LEADS = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 
@@ -32,7 +32,7 @@ export default function CaseDetail({ id, onChange }) {
     }).catch((e) => setErr(e.message))
   }, [id])
 
-  if (err) return <div className="empty">{err}</div>
+  if (err) return <ErrorState title="Case could not be loaded" message="The case details are currently unavailable." detail={err} />
   if (!c) return <div className="empty"><span className="spinner" /></div>
   const r = c.result
   const ai = r.flagged.length ? r.flagged : r.category === 'normal' ? ['NORM'] : []
@@ -51,7 +51,7 @@ export default function CaseDetail({ id, onChange }) {
   const del = async () => { if (confirm('Delete this case?')) { await api.del(c.id); onChange?.(); navigate('#/queue') } }
 
   return (
-    <div className="fade-in">
+    <div>
       <div className="page-head">
         <div>
           <button className="btn sm ghost no-print" onClick={() => history.back()} style={{ marginBottom: 8 }}><ArrowLeft size={14} /> Back</button>
@@ -63,7 +63,7 @@ export default function CaseDetail({ id, onChange }) {
         </div>
         <div className="row no-print">
           <button className="btn" onClick={() => window.print()}><Printer size={15} /> Print report</button>
-          <button className="btn danger ghost" onClick={del}><Trash2 size={15} /></button>
+          <button className="btn danger ghost" aria-label="Delete case" onClick={del}><Trash2 size={15} /></button>
         </div>
       </div>
 
@@ -82,7 +82,7 @@ export default function CaseDetail({ id, onChange }) {
             {r.triage.reasons.map((x, i) => <span key={i} className="chip" style={{ cursor: 'default' }}>{x}</span>)}
           </div>
         </div>
-        <div className="grid g-2" style={{ gap: 12 }}>
+        <div className="case-metrics">
           <Mini icon={<HeartPulse size={16} />} label="Heart rate" value={r.rhythm.heart_rate ? `${Math.round(r.rhythm.heart_rate)} bpm` : '—'} hint={r.rhythm.rhythm_note} />
           <Mini icon={<Gauge size={16} />} label="Signal quality" value={`${Math.round(r.quality.score)}/100`} hint={r.quality.grade} warn={r.quality.grade === 'poor'} />
           <Mini icon={<BrainCircuit size={16} />} label="Model agreement" value={focus ? `${Math.round(focus.model_votes * 100)}%` : '—'} hint={`${r.ensemble_size} models · ${focus ? CLASS_SHORT[focus.code] : ''}`} />
@@ -109,9 +109,10 @@ export default function CaseDetail({ id, onChange }) {
             highlight={focus?.top_leads || []} selected={lead} onSelect={setLead} rPeaks={r.rhythm.r_peaks} />
         </div>
         <div className="row between" style={{ marginTop: 14 }}>
-          <div className="row"><strong>Lead {lead}</strong><span className="muted small">— full 10 s, blue dashes = detected beats</span></div>
+          <div className="row"><strong>Lead {lead}</strong><span className="muted small">— full 10 s, teal markers = detected beats</span></div>
           <div className="row wrap no-print" style={{ gap: 4 }}>
-            {LEADS.map((l) => <span key={l} className={`chip ${lead === l ? 'on' : ''}`} style={{ padding: '3px 8px' }} onClick={() => setLead(l)}>{l}</span>)}
+            {LEADS.map((l) => <button type="button" key={l} className={`chip ${lead === l ? 'on' : ''}`}
+              aria-pressed={lead === l} style={{ padding: '3px 8px' }} onClick={() => setLead(l)}>{l}</button>)}
           </div>
         </div>
         <div className="ecg-wrap" style={{ marginTop: 8 }}>
@@ -148,7 +149,7 @@ export default function CaseDetail({ id, onChange }) {
               <PolarAngleAxis dataKey="name" tick={{ fill: '#b6bcc8', fontSize: 11 }} />
               <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
               <Radar isAnimationActive={false} name="Threshold" dataKey="threshold" stroke="#8a909c" strokeDasharray="4 3" fill="none" strokeWidth={1.5} />
-              <Radar isAnimationActive={false} name="Probability" dataKey="probability" stroke="#38bdf8" fill="#38bdf8" fillOpacity={0.25} strokeWidth={2} />
+              <Radar isAnimationActive={false} name="Probability" dataKey="probability" stroke="#45b8c8" fill="#45b8c8" fillOpacity={0.25} strokeWidth={2} />
               <Tooltip content={<ChartTip fmt={(v) => `${v}%`} />} />
             </RadarChart>
           </ResponsiveContainer>
@@ -167,7 +168,7 @@ export default function CaseDetail({ id, onChange }) {
                 <div key={cl} className="small row" style={{ gap: 6 }}><span className="cls-dot" style={{ background: CLASS_COLORS[cl] }} />{CLASS_SHORT[cl]}</div>,
                 ...row.map((v, i) => (
                   <div key={cl + i} className="heat-cell" title={`${CLASS_NAMES[cl]} · ${LEADS[i]}: ${(v * 100).toFixed(1)}%`}
-                    style={{ background: `rgba(57,135,229,${0.08 + 0.85 * (v / mx)})` }}>{(v * 100).toFixed(0)}</div>
+                    style={{ background: `rgba(69,184,200,${0.08 + 0.75 * (v / mx)})` }}>{(v * 100).toFixed(0)}</div>
                 )),
               ]
             })}
@@ -176,7 +177,8 @@ export default function CaseDetail({ id, onChange }) {
         <Card title="Signal quality by lead" sub={r.quality.issues.length ? `${r.quality.issues.length} issue(s) detected` : 'No quality issues detected'}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6 }}>
             {r.quality.per_lead.map((q) => (
-              <div key={q.lead} title={q.issues.join(', ') || 'OK'} style={{ textAlign: 'center', padding: '8px 0', borderRadius: 8, background: 'var(--surface-2)', border: `1px solid ${q.score >= 85 ? 'rgba(12,163,12,.4)' : q.score >= 65 ? 'rgba(250,178,25,.4)' : 'rgba(208,59,59,.5)'}` }}>
+              <div key={q.lead} className={`quality-cell ${q.score >= 85 ? 'good' : q.score >= 65 ? 'limited' : 'poor'}`}
+                title={q.issues.join(', ') || 'OK'}>
                 <div className="small muted">{q.lead}</div>
                 <div style={{ fontWeight: 650 }}>{Math.round(q.score)}</div>
               </div>
@@ -191,7 +193,7 @@ export default function CaseDetail({ id, onChange }) {
       <div className="grid g-2">
         <Card title="AI report" icon={<FileText size={16} color="var(--accent)" />}>
           <p style={{ lineHeight: 1.7, color: 'var(--text-2)', marginTop: 4 }}>{r.narrative}</p>
-          {r.uncertain.length > 0 && <div className="disclaimer" style={{ marginBottom: 10 }}><ShieldAlert size={16} />Borderline outputs: {r.uncertain.map((u) => CLASS_SHORT[u]).join(', ')}. The models disagree or the probability is close to the threshold.</div>}
+          {r.uncertain.length > 0 && <div className="model-note"><ShieldAlert size={16} aria-hidden="true" />Borderline outputs: {r.uncertain.map((u) => CLASS_SHORT[u]).join(', ')}. The models disagree or the probability is close to the threshold.</div>}
           {gt && (
             <div className="row" style={{ padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 10 }}>
               <span className="small muted">PTB-XL cardiologist label:</span>
@@ -212,9 +214,10 @@ export default function CaseDetail({ id, onChange }) {
             {CLASSES.map((cl) => {
               const on = review.labels.includes(cl)
               return (
-                <span key={cl} className={`chip ${on ? 'on' : ''}`} onClick={() => setReview((rv) => ({ ...rv, labels: on ? rv.labels.filter((x) => x !== cl) : [...rv.labels, cl] }))}>
+                <button type="button" key={cl} className={`chip ${on ? 'on' : ''}`} aria-pressed={on}
+                  onClick={() => setReview((rv) => ({ ...rv, labels: on ? rv.labels.filter((x) => x !== cl) : [...rv.labels, cl] }))}>
                   <span className="cls-dot" style={{ background: CLASS_COLORS[cl] }} />{CLASS_NAMES[cl]}
-                </span>
+                </button>
               )
             })}
           </div>
@@ -236,10 +239,10 @@ export default function CaseDetail({ id, onChange }) {
 
 function Mini({ icon, label, value, hint, warn }) {
   return (
-    <div className="card" style={{ padding: 14 }}>
-      <div className="row small muted" style={{ gap: 6 }}><span style={{ color: warn ? 'var(--warning)' : 'var(--accent)' }}>{icon}</span>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 650, marginTop: 6 }}>{value}</div>
-      <div className="small" style={{ color: warn ? '#ffcc5c' : 'var(--muted)', marginTop: 2 }}>{hint}</div>
+    <div className={`case-metric ${warn ? 'warn' : ''}`}>
+      <div className="case-metric-label"><span>{icon}</span>{label}</div>
+      <div className="case-metric-value">{value}</div>
+      <div className="case-metric-hint">{hint}</div>
     </div>
   )
 }

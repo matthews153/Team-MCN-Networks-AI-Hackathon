@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AlertCircle, FileUp, FlaskConical, Play, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
 import { api, CLASSES, SYMPTOMS, navigate } from '../lib'
-import { Card, ClassTag, Findings, TriageBadge } from '../components/ui'
+import { Card, ClassTag, ErrorState, Findings, TriageBadge } from '../components/ui'
 
 export default function Analyze({ health, onDone }) {
   const [patient, setPatient] = useState({ patient_id: '', age: '', sex: '', symptoms: [], facility: '', notes: '' })
@@ -45,7 +45,7 @@ export default function Analyze({ health, onDone }) {
   const shown = samples.filter((s) => filter === 'ALL' || (filter === 'FAIL' ? s.is_failure_case : s.true_labels.includes(filter)))
 
   return (
-    <div className="fade-in">
+    <div>
       <div className="page-head">
         <div>
           <h2>New ECG analysis</h2>
@@ -53,7 +53,7 @@ export default function Analyze({ health, onDone }) {
         </div>
       </div>
 
-      {!health?.model_ready && <div className="disclaimer" style={{ marginBottom: 16 }}><AlertCircle size={16} />The model is not trained yet. Run <span className="mono">python -m ml.train</span> first.</div>}
+      {health && !health.model_ready && <div className="disclaimer" style={{ marginBottom: 16 }}><AlertCircle size={16} />The model is not trained yet. Run <span className="mono">python -m ml.train</span> first.</div>}
 
       <div className="grid g-3" style={{ marginBottom: 16 }}>
         <Card title="Patient context" sub="Optional — symptoms raise review priority. Use anonymised IDs only.">
@@ -67,33 +67,41 @@ export default function Analyze({ health, onDone }) {
                 </select>
               </label>
             </div>
-            <div className="field">Presenting symptoms
+            <fieldset className="field symptom-field">
+              <legend>Presenting symptoms</legend>
               <div className="row wrap" style={{ gap: 6 }}>
-                {SYMPTOMS.map((s) => <span key={s} className={`chip ${patient.symptoms.includes(s) ? 'on' : ''}`} onClick={() => toggleSym(s)}>{s}</span>)}
+                {SYMPTOMS.map((s) => <button type="button" key={s} className={`chip ${patient.symptoms.includes(s) ? 'on' : ''}`}
+                  aria-pressed={patient.symptoms.includes(s)} onClick={() => toggleSym(s)}>{s}</button>)}
               </div>
-            </div>
+            </fieldset>
             <label className="field">Referring facility<input className="input" placeholder="e.g. District Clinic A" value={patient.facility} onChange={(e) => set('facility', e.target.value)} /></label>
             <label className="field">Clinical notes<textarea className="input" rows={2} value={patient.notes} onChange={(e) => set('notes', e.target.value)} /></label>
           </div>
         </Card>
 
         <Card title="Upload ECG files" sub="WFDB (.hea + .dat), CSV (12 lead columns), JSON, NPY, or a ZIP of these. Any sampling rate — resampled to 100 Hz, 10 s." className="span-2">
-          <div className={`dropzone ${drag ? 'drag' : ''}`}
-            onClick={() => inputRef.current.click()}
+          <div className={`dropzone ${drag ? 'drag' : ''}`} role="button" tabIndex={0}
+            aria-label="Choose ECG files to upload"
+            onClick={(e) => { if (e.target !== inputRef.current) inputRef.current.click() }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inputRef.current.click() }
+            }}
             onDragOver={(e) => { e.preventDefault(); setDrag(true) }}
             onDragLeave={() => setDrag(false)}
             onDrop={(e) => { e.preventDefault(); setDrag(false); addFiles(e.dataTransfer.files) }}>
             <FileUp size={34} color="var(--accent)" />
             <div style={{ fontWeight: 600, marginTop: 10 }}>Drop ECG files here or click to browse</div>
             <div className="muted small" style={{ marginTop: 4 }}>Batch upload supported — try the files in <span className="mono">sample_uploads/</span></div>
-            <input ref={inputRef} type="file" multiple hidden onChange={(e) => { addFiles(e.target.files); e.target.value = '' }} />
+            <input ref={inputRef} type="file" multiple hidden aria-label="ECG files"
+              onChange={(e) => { addFiles(e.target.files); e.target.value = '' }} />
           </div>
           {files.length > 0 && (
             <div style={{ marginTop: 14 }}>
               {files.map((f, i) => (
                 <div key={i} className="row between" style={{ padding: '7px 10px', background: 'var(--surface-2)', borderRadius: 8, marginBottom: 6 }}>
                   <span className="row small"><FileUp size={14} className="muted" /> {f.name} <span className="muted">· {(f.size / 1024).toFixed(0)} KB</span></span>
-                  <button className="btn sm ghost" onClick={() => setFiles(files.filter((_, j) => j !== i))}><X size={13} /></button>
+                  <button type="button" className="btn sm ghost" aria-label={`Remove ${f.name}`}
+                    onClick={() => setFiles(files.filter((_, j) => j !== i))}><X size={13} /></button>
                 </div>
               ))}
             </div>
@@ -107,16 +115,18 @@ export default function Analyze({ health, onDone }) {
               </button>
             </div>
           </div>
-          {err && <div className="disclaimer" style={{ marginTop: 12 }}><AlertCircle size={16} />{err}</div>}
+          {err && <ErrorState title="Analysis could not be completed" message="Check the selected ECG files and try again." detail={err} />}
           {results && (
             <div style={{ marginTop: 16 }}>
               <h3 style={{ fontSize: 13 }}>Results</h3>
               <table className="table">
                 <tbody>
                   {results.map((r, i) => (
-                    <tr key={i} className={r.case_id ? 'click' : ''} onClick={() => r.case_id && navigate(`#/case/${r.case_id}`)}>
+                    <tr key={i} className={r.case_id ? 'click' : ''} tabIndex={r.case_id ? 0 : undefined}
+                      onKeyDown={(e) => { if (r.case_id && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); navigate(`#/case/${r.case_id}`) } }}
+                      onClick={() => r.case_id && navigate(`#/case/${r.case_id}`)}>
                       <td className="small">{r.name}</td>
-                      {r.error ? <td colSpan={2} style={{ color: '#ff8b8b' }} className="small">{r.error}</td> : (
+                      {r.error ? <td colSpan={2} style={{ color: 'var(--critical)' }} className="small">{r.error}</td> : (
                         <>
                           <td><Findings flagged={r.summary.flagged} category={r.summary.category} /></td>
                           <td><TriageBadge level={r.summary.triage.level} score={r.summary.triage.score} /></td>
@@ -136,26 +146,31 @@ export default function Analyze({ health, onDone }) {
         right={
           <div className="row wrap" style={{ gap: 6 }}>
             {['ALL', ...CLASSES, 'FAIL'].map((c) => (
-              <span key={c} className={`chip ${filter === c ? 'on' : ''}`} onClick={() => setFilter(c)}>{c === 'ALL' ? 'All' : c === 'FAIL' ? 'Known failures' : c}</span>
+              <button type="button" key={c} className={`chip ${filter === c ? 'on' : ''}`} aria-pressed={filter === c}
+                onClick={() => setFilter(c)}>{c === 'ALL' ? 'All' : c === 'FAIL' ? 'Known failures' : c}</button>
             ))}
           </div>
         }>
-        <div className="grid g-4">
-          {shown.map((s) => (
-            <div key={s.idx} className="card" style={{ background: 'var(--surface-2)', padding: 14 }}>
-              <div className="row between">
-                <strong className="mono small">ECG #{s.ecg_id}</strong>
-                {s.is_failure_case && <span className="badge neutral" title="Among the model's largest test errors">hard case</span>}
-              </div>
-              <div className="muted small" style={{ margin: '4px 0 8px' }}>{s.age ? `${Math.round(s.age)}y` : '—'} · {s.sex === 'F' ? 'Female' : 'Male'}</div>
-              <div className="small muted">Cardiologist label</div>
-              <div style={{ minHeight: 22, marginTop: 2 }}>{s.true_labels.map((c) => <ClassTag key={c} code={c} />)}</div>
-              <button className="btn sm" style={{ marginTop: 10, width: '100%', justifyContent: 'center' }} disabled={busySample != null || !health?.model_ready} onClick={() => runSample(s)}>
-                {busySample === s.idx ? <span className="spinner" /> : <Play size={13} />} Analyse
-              </button>
-            </div>
-          ))}
-        </div>
+        {shown.length === 0 ? <div className="empty">No records match this filter.</div> : (
+          <div className="table-scroll">
+            <table className="table demo-table">
+              <thead><tr><th scope="col">ECG record</th><th scope="col">Age / sex</th><th scope="col">Cardiologist label</th><th scope="col">Evaluation</th><th scope="col"><span className="sr-only">Action</span></th></tr></thead>
+              <tbody>{shown.map((s) => (
+                <tr key={s.idx}>
+                  <td className="mono">#{s.ecg_id}</td>
+                  <td>{s.age ? `${Math.round(s.age)}y` : '—'} · {s.sex === 'F' ? 'Female' : 'Male'}</td>
+                  <td>{s.true_labels.map((c) => <ClassTag key={c} code={c} />)}</td>
+                  <td>{s.is_failure_case ? <span className="badge neutral" title="Among the model's largest test errors">Hard case</span> : <span className="muted">—</span>}</td>
+                  <td className="action-cell">
+                    <button className="btn sm" aria-label={`Analyse ECG ${s.ecg_id}`} disabled={busySample != null || !health?.model_ready} onClick={() => runSample(s)}>
+                      {busySample === s.idx ? <span className="spinner" /> : <Play size={13} />} Analyse
+                    </button>
+                  </td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </div>
   )
