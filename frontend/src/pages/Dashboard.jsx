@@ -131,7 +131,7 @@ export default function Dashboard({ cases, health, onChange }) {
               <Tooltip cursor={{ fill: 'rgba(23,87,101,0.05)' }} content={<ChartTip />} />
               <Bar isAnimationActive={false} dataKey="routine" name="Routine" stackId="a" fill={TRIAGE.routine.color} stroke="var(--surface)" strokeWidth={2} />
               <Bar isAnimationActive={false} dataKey="priority" name="Priority" stackId="a" fill={TRIAGE.priority.color} stroke="var(--surface)" strokeWidth={2} />
-              <Bar isAnimationActive={false} dataKey="urgent" name="Urgent" stackId="a" fill={TRIAGE.urgent.color} stroke="var(--surface)" strokeWidth={2} radius={[4, 4, 0, 0]} />
+              <Bar isAnimationActive={false} dataKey="urgent" name="Urgent" stackId="a" fill={TRIAGE.urgent.color} stroke="var(--surface)" strokeWidth={2} radius={0} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
@@ -187,7 +187,7 @@ export default function Dashboard({ cases, health, onChange }) {
               <XAxis type="number" allowDecimals={false} {...axisProps} />
               <YAxis type="category" dataKey="name" {...axisProps} width={80} />
               <Tooltip cursor={{ fill: 'rgba(23,87,101,0.05)' }} content={<ChartTip fmt={(v) => `${v} cases`} />} />
-              <Bar isAnimationActive={false} dataKey="value" name="Cases" radius={[0, 4, 4, 0]} barSize={18} label={{ position: 'right', fill: 'var(--text-2)', fontSize: 11 }}>
+              <Bar isAnimationActive={false} dataKey="value" name="Cases" radius={0} barSize={18} label={{ position: 'right', fill: 'var(--text-2)', fontSize: 11 }}>
                 {stats.findings.map((f) => <Cell key={f.code} fill={CLASS_COLORS[f.code]} />)}
               </Bar>
             </BarChart>
@@ -206,7 +206,7 @@ export default function Dashboard({ cases, health, onChange }) {
               <YAxis allowDecimals={false} {...axisProps} width={28} />
               <Tooltip cursor={{ fill: 'rgba(23,87,101,0.05)' }} content={<ChartTip labelFmt={(l) => `Age ${l}`} />} />
               {CLASSES.slice(1).map((c) => (
-                <Bar isAnimationActive={false} key={c} dataKey={c} name={CLASS_SHORT[c]} fill={CLASS_COLORS[c]} radius={[4, 4, 0, 0]} />
+                <Bar isAnimationActive={false} key={c} dataKey={c} name={CLASS_SHORT[c]} fill={CLASS_COLORS[c]} radius={0} />
               ))}
             </BarChart>
           </ResponsiveContainer>
@@ -218,7 +218,7 @@ export default function Dashboard({ cases, health, onChange }) {
               <XAxis dataKey="bin" {...axisProps} interval={1} />
               <YAxis allowDecimals={false} {...axisProps} width={28} />
               <Tooltip cursor={{ fill: 'rgba(23,87,101,0.05)' }} content={<ChartTip fmt={(v) => `${v} cases`} labelFmt={(l) => `Score ${l}`} />} />
-              <Bar isAnimationActive={false} dataKey="n" name="Cases" fill="var(--accent)" radius={[4, 4, 0, 0]} />
+              <Bar isAnimationActive={false} dataKey="n" name="Cases" fill="var(--accent)" radius={0} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
