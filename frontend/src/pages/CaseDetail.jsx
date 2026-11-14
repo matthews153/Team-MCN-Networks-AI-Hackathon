@@ -58,7 +58,8 @@ export default function CaseDetail({ id, onChange }) {
           <h2 className="row">Case {c.patient?.patient_id || c.id}{c.demo && <span className="demo-tag" title="Demo case built from a PTB-XL test ECG">Demo</span>} <TriageBadge level={r.triage.level} score={r.triage.score} large /></h2>
           <p>
             {c.patient?.age ? `${Math.round(c.patient.age)} y` : 'Age —'} · {c.patient?.sex === 'F' ? 'Female' : c.patient?.sex === 'M' ? 'Male' : 'Sex —'}
-            {c.patient?.facility ? ` · ${c.patient.facility}` : ''} · {c.source} · received {fmtDate(c.created_at)}
+            {c.patient?.facility ? ` · ${c.patient.facility}` : ''} · {c.source} · received {fmtDate(c.created_at)}{c.uploaded_by ? ` · uploaded by ${c.uploaded_by}` : ''}
+            {c.patient?.from_file?.length > 0 && <span className="muted"> · {c.patient.from_file.join(' & ')} read from the ECG file</span>}
           </p>
         </div>
         <div className="row no-print">
@@ -210,7 +211,7 @@ export default function CaseDetail({ id, onChange }) {
         </Card>
 
         <Card title="Clinician review" icon={<ClipboardCheck size={16} color="var(--accent)" />}
-          right={c.review.status === 'reviewed' ? <span className="badge routine"><CheckCircle2 size={13} /> Reviewed {fmtDate(c.review.reviewed_at)}</span> : <span className="badge neutral">Pending</span>}>
+          right={c.review.status === 'reviewed' ? <span className="badge routine"><CheckCircle2 size={13} /> Reviewed{c.review.reviewed_by ? ` by ${c.review.reviewed_by}` : ''} {fmtDate(c.review.reviewed_at)}</span> : <span className="badge neutral">Pending</span>}>
           <div className="small muted" style={{ marginBottom: 6 }}>Your interpretation (select all that apply)</div>
           <div className="row wrap" style={{ gap: 6, marginBottom: 12 }}>
             {CLASSES.map((cl) => {
@@ -230,7 +231,7 @@ export default function CaseDetail({ id, onChange }) {
           </div>
           {c.review.status === 'reviewed' && (
             <div className="small text-2" style={{ marginTop: 12 }}>
-              Recorded: {c.review.agrees ? 'agrees with AI' : 'differs from AI'} · {(c.review.doctor_labels || []).map((x) => CLASS_SHORT[x]).join(', ') || 'no labels'}
+              Recorded{c.review.reviewed_by ? ` by ${c.review.reviewed_by}` : ''}: {c.review.agrees ? 'agrees with AI' : 'differs from AI'} · {(c.review.doctor_labels || []).map((x) => CLASS_SHORT[x]).join(', ') || 'no labels'}
             </div>
           )}
         </Card>

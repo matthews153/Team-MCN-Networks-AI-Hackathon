@@ -3,12 +3,13 @@ import { Download, FlaskConical, Search, Trash2 } from 'lucide-react'
 import { api, CLASSES, CLASS_COLORS, CLASS_SHORT, TRIAGE, fmtDate, navigate } from '../lib'
 import { Card, Findings, TriageBadge } from '../components/ui'
 
-export default function Queue({ cases, demo, onChange }) {
+export default function Queue({ cases, demo, doctor, onChange }) {
   const [level, setLevel] = useState('all')
   const [status, setStatus] = useState('pending')
   const [finding, setFinding] = useState('all')
   const [q, setQ] = useState('')
   const [sort, setSort] = useState('priority')
+  const [who, setWho] = useState('all')
 
   // Reading order among the cases currently shown (demo toggle respected): most urgent first,
   // ties broken by who has waited longest. The 0–100 score itself is per patient and never changes.
@@ -21,13 +22,14 @@ export default function Queue({ cases, demo, onChange }) {
     let r = cases.filter((c) =>
       (level === 'all' || c.triage.level === level) &&
       (status === 'all' || (status === 'pending' ? c.review.status !== 'reviewed' : c.review.status === 'reviewed')) &&
+      (who === 'all' || c.uploaded_by === doctor || c.review.reviewed_by === doctor) &&
       (finding === 'all' || (finding === 'NORM' ? c.category === 'normal' : c.flagged.includes(finding))) &&
       (!q || JSON.stringify([c.patient, c.source]).toLowerCase().includes(q.toLowerCase())))
     r = [...r].sort((a, b) => sort === 'priority'
       ? byPriority(a, b)
       : sort === 'newest' ? b.created_at - a.created_at : a.quality.score - b.quality.score)
     return r
-  }, [cases, level, status, finding, q, sort])
+  }, [cases, level, status, finding, q, sort, who, doctor])
 
   const exportCsv = () => {
     const head = ['case_id', 'patient_id', 'age', 'sex', 'priority', 'score', 'findings', ...CLASSES.map((c) => `p_${c}`), 'quality', 'hr', 'review_status', 'doctor_labels', 'agrees', 'received']
@@ -68,6 +70,13 @@ export default function Queue({ cases, demo, onChange }) {
           <span className="filter-label">Review status</span>
           <div className="seg">
             {['pending', 'reviewed', 'all'].map((s) => <button key={s} className={status === s ? 'on' : ''} onClick={() => setStatus(s)}>{s[0].toUpperCase() + s.slice(1)}</button>)}
+          </div>
+        </div>
+        <div className="filter-group">
+          <span className="filter-label">Doctor</span>
+          <div className="seg">
+            <button className={who === 'all' ? 'on' : ''} onClick={() => setWho('all')}>Everyone</button>
+            <button className={who === 'mine' ? 'on' : ''} onClick={() => setWho('mine')} title="Cases you uploaded or reviewed">Mine</button>
           </div>
         </div>
         <div className="filter-group">
@@ -116,8 +125,9 @@ export default function Queue({ cases, demo, onChange }) {
                   <td className="num" style={{ color: c.quality.grade === 'poor' ? 'var(--critical)' : undefined }}>{Math.round(c.quality.score)}</td>
                   <td>{c.review.status === 'reviewed'
                     ? <span className={`badge ${c.review.agrees ? 'routine' : 'priority'}`}>{c.review.agrees ? 'Agreed' : 'Overridden'}</span>
-                    : <span className="badge neutral">Pending</span>}</td>
-                  <td className="muted small">{fmtDate(c.created_at)}</td>
+                    : <span className="badge neutral">Pending</span>}
+                    {c.review.reviewed_by && <div className="muted small signed-by">by {c.review.reviewed_by}</div>}</td>
+                  <td className="muted small">{fmtDate(c.created_at)}{c.uploaded_by && <div className="signed-by">by {c.uploaded_by}</div>}</td>
                 </tr>
               ))}
             </tbody>

@@ -16,8 +16,15 @@ export const TRIAGE = {
 }
 export const SYMPTOMS = ['chest pain', 'shortness of breath', 'palpitations', 'dizziness', 'syncope', 'fatigue']
 
+// Name-only sign-in: the chosen doctor is remembered per browser and sent with every request
+const DOCTOR_KEY = 'cardiolens.doctor'
+export const getDoctor = () => localStorage.getItem(DOCTOR_KEY) || ''
+export const setDoctor = (name) => (name ? localStorage.setItem(DOCTOR_KEY, name) : localStorage.removeItem(DOCTOR_KEY))
+
 async function req(path, opts = {}) {
-  const r = await fetch(path, opts)
+  const headers = { ...(opts.headers || {}) }
+  if (getDoctor()) headers['X-Doctor'] = encodeURIComponent(getDoctor())
+  const r = await fetch(path, { ...opts, headers })
   if (!r.ok) {
     let msg = r.statusText
     try { msg = (await r.json()).detail || msg } catch { /* ignore */ }
@@ -50,6 +57,12 @@ export const api = {
   clear: () => req('/api/cases', { method: 'DELETE' }),
   clearDemo: () => req('/api/cases?demo_only=true', { method: 'DELETE' }),
   seed: () => req('/api/demo/seed', { method: 'POST' }),
+  doctors: () => req('/api/doctors'),
+  addDoctor: (name) => req('/api/doctors', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
+  }),
+  facilities: () => req('/api/facilities'),
+  patient: (pid) => req(`/api/patients/${encodeURIComponent(pid)}`),
 }
 
 export const pct = (v, d = 0) => (v == null || Number.isNaN(v) ? '—' : `${(v * 100).toFixed(d)}%`)

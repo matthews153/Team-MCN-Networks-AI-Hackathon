@@ -98,7 +98,8 @@ unzip ptbxl.zip && rm ptbxl.zip && cd ..
 
 ### Dashboard pages
 * **Dashboard:** KPIs (volume, urgent unreviewed, pending, AI–clinician agreement, time to review, signal quality), daily volume by priority, triage mix, urgent worklist, findings by category and age group, priority-score distribution.
-* **New analysis:** patient context (age, sex, symptoms), drag-and-drop batch upload, and a demo library of unseen test-fold ECGs with their cardiologist labels.
+* **Sign-in:** pick your name or type a new one (no passwords). The review queue is shared; uploads and reviews are signed with the doctor's name, and the queue can be filtered to *Mine*.
+* **New analysis:** patient context (age, sex, symptoms) with **voice dictation** (age, sex and symptoms are picked out of what you say, and the full text goes into the notes), **autofill** (age/sex read from WFDB header comments or JSON files; a returning patient ID fills in their last known details), and facility suggestions from past cases. Also drag-and-drop batch upload with a format guide and file checks, and a demo library of unseen test-fold ECGs with their cardiologist labels.
 * **Case view:** 12-lead ECG on standard paper (3×4 + rhythm strip, or 12×10 s) with an AI-attention overlay, single-lead inspector with detected beats, probability bars with thresholds and per-model dots, radar profile, lead-importance heatmap, per-lead quality, an AI narrative report, and a clinician review panel (agree or override). The page can be printed.
 * **Review queue:** filter, sort, search, CSV export, and removal of demo cases only.
 * **Model insights:** baseline comparison, normal/abnormal confusion matrix, per-class metrics with **missed cases and false alarms reported separately**, ROC/PR curves, failure butterfly chart, fairness by sex and age, calibration, training curves, dataset composition and label co-occurrence, and the hardest test cases.

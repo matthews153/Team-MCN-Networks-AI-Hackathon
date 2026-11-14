@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AlertCircle, BrainCircuit, FlaskConical, Info, ShieldAlert, LayoutDashboard, ListChecks, Menu, Upload, X } from 'lucide-react'
-import { api } from './lib'
+import { AlertCircle, BrainCircuit, FlaskConical, Info, LogOut, ShieldAlert, UserRound, LayoutDashboard, ListChecks, Menu, Upload, X } from 'lucide-react'
+import { api, getDoctor, setDoctor } from './lib'
+import SignIn from './pages/SignIn'
 import Dashboard from './pages/Dashboard'
 import Analyze from './pages/Analyze'
 import Queue from './pages/Queue'
@@ -32,6 +33,9 @@ export default function App() {
   const [cases, setCases] = useState([])
   const [error, setError] = useState(null)
   const [navOpen, setNavOpen] = useState(false)
+  const [doctor, setDoctorState] = useState(getDoctor)
+  const signIn = (name) => { setDoctor(name); setDoctorState(name) }
+  const signOut = () => { setDoctor(''); setDoctorState('') }
   // Demo / synthetic cases can be hidden so only real patients are shown (remembered per browser)
   const [showDemo, setShowDemoState] = useState(() => localStorage.getItem('cardiolens.showDemo') !== 'false')
   const setShowDemo = useCallback((v) => { localStorage.setItem('cardiolens.showDemo', String(v)); setShowDemoState(v) }, [])
@@ -61,10 +65,12 @@ export default function App() {
   const activeNav = NAV.find((n) => n.hash === '#/' ? hash === '#/' || hash === '' : hash.startsWith(n.hash))
   const mobileTitle = caseMatch ? 'Case review' : activeNav?.label || 'Dashboard'
 
+  if (!doctor) return <SignIn onSignIn={signIn} />
+
   let page
   if (caseMatch) page = <CaseDetail id={caseMatch[1]} onChange={refresh} />
-  else if (hash.startsWith('#/analyze')) page = <Analyze health={health} onDone={refresh} />
-  else if (hash.startsWith('#/queue')) page = <Queue cases={visibleCases} demo={demo} onChange={refresh} />
+  else if (hash.startsWith('#/analyze')) page = <Analyze health={health} demo={demo} onDone={refresh} />
+  else if (hash.startsWith('#/queue')) page = <Queue cases={visibleCases} demo={demo} doctor={doctor} onChange={refresh} />
   else if (hash.startsWith('#/model')) page = <ModelInsights />
   else if (hash.startsWith('#/about')) page = <About />
   else page = <Dashboard cases={visibleCases} demo={demo} health={health} onChange={refresh} />
@@ -99,6 +105,11 @@ export default function App() {
           })}
         </nav>
         <div className="sidebar-foot">
+          <div className="doctor-chip">
+            <UserRound size={15} aria-hidden="true" />
+            <span><small>Signed in as</small><strong title={doctor}>{doctor}</strong></span>
+            <button type="button" className="doctor-switch" onClick={signOut} title="Switch doctor" aria-label="Switch doctor"><LogOut size={14} /></button>
+          </div>
           <label className="demo-toggle" title="Demo cases are built from unseen PTB-XL test ECGs with synthetic patient details">
             <FlaskConical size={15} aria-hidden="true" />
             <span>

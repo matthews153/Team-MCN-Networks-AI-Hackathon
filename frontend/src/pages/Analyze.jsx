@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertCircle, AlertTriangle, Ban, ChevronRight, FileUp, FlaskConical, Play, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
-import { api, CLASSES, SYMPTOMS, navigate } from '../lib'
+import { AlertCircle, AlertTriangle, Ban, ChevronRight, Info, Mic, MicOff, FileUp, FlaskConical, Play, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
+import { api, CLASSES, SYMPTOMS, fmtDate, navigate } from '../lib'
+import { applyDictation, readDemographics, useDictation } from '../patientInput'
 import { Card, ClassTag, ErrorState, Findings, TriageBadge } from '../components/ui'
 
 const ACCEPT = '.hea,.dat,.csv,.txt,.json,.npy,.zip'
@@ -46,7 +47,7 @@ function loadLastUpload() {
   try { return JSON.parse(sessionStorage.getItem(LAST_UPLOAD_KEY)) } catch { return null }
 }
 
-export default function Analyze({ health, onDone }) {
+export default function Analyze({ health, demo, onDone }) {
   const [patient, setPatient] = useState({ patient_id: '', age: '', sex: '', symptoms: [], facility: '', notes: '' })
   const [files, setFiles] = useState([])
   const [drag, setDrag] = useState(false)
@@ -59,14 +60,67 @@ export default function Analyze({ health, onDone }) {
   const [busySample, setBusySample] = useState(null)
   const inputRef = useRef()
 
+  const [facilities, setFacilities] = useState([])
+  const [autofill, setAutofill] = useState(null)   // short note on what was filled in automatically
+
   useEffect(() => { api.samples().then(setSamples).catch(() => {}) }, [])
+  useEffect(() => { api.facilities().then(setFacilities).catch(() => {}) }, [last])
+
+  // Voice: dictated text goes into the notes; age, sex and symptoms are picked out of it
+  // (useDictation always calls the latest version of this callback, so `patient` is current)
+  const dictation = useDictation((text) => {
+    const { patient: next, filled } = applyDictation(text, patient)
+    setPatient(next)
+    setAutofill(filled.length ? `From dictation: ${filled.join(', ')} — full text added to notes` : 'Dictation added to clinical notes')
+  })
+
+  // Returning patient: fill empty fields from their most recent case
+  const lookupPatient = async () => {
+    const pid = patient.patient_id.trim()
+    if (!pid) return
+    try {
+      const info = await api.patient(pid)
+      const fill = {}
+      if (patient.age === '' && info.age != null) fill.age = String(Math.round(info.age))
+      if (!patient.sex && info.sex) fill.sex = info.sex
+      if (!patient.facility && info.facility) fill.facility = info.facility
+      const filled = Object.keys(fill)
+      if (filled.length) setPatient((p) => ({ ...p, ...fill }))
+      setAutofill(`${info.case_count} earlier case${info.case_count > 1 ? 's' : ''} for ${info.patient_id} (last ${fmtDate(info.last_seen)})` +
+        (filled.length ? ` — filled ${filled.join(', ')}` : ''))
+    } catch { /* new patient: nothing to fill */ }
+  }
 
   const set = (k, v) => setPatient((p) => ({ ...p, [k]: v }))
   const toggleSym = (s) => set('symptoms', patient.symptoms.includes(s) ? patient.symptoms.filter((x) => x !== s) : [...patient.symptoms, s])
   // Copy the FileList right away: the picker's list is live and is emptied when the input is reset
   const addFiles = (list) => {
     const picked = Array.from(list || [])
-    if (picked.length) setFiles((f) => [...f, ...picked])
+    if (!picked.length) return
+    setFiles((f) => [...f, ...picked])
+    fillFromFiles(picked)
+  }
+  // Some ECG files carry the patient's age/sex (WFDB header comments, JSON fields)
+  const fillFromFiles = async (picked) => {
+    const found = []
+    for (const f of picked) {
+      const d = await readDemographics(f)
+      if (d.age != null || d.sex) found.push({ name: f.name, ...d })
+    }
+    if (!found.length) return
+    const stems = new Set(picked.map((f) => f.name.replace(/\.[^.]+$/, '')))
+    if (stems.size > 1) {
+      setAutofill("Some of these files include age/sex — each case will use its own file's values where the form is left empty.")
+      return
+    }
+    const d = found[0]
+    const fill = {}
+    if (patient.age === '' && d.age != null) fill.age = String(d.age)
+    if (!patient.sex && d.sex) fill.sex = d.sex
+    const filledAny = Object.keys(fill).length > 0
+    if (filledAny) setPatient((p) => ({ ...p, ...fill }))
+    const what = [d.age != null && `age ${d.age}`, d.sex && (d.sex === 'F' ? 'female' : 'male')].filter(Boolean).join(', ')
+    setAutofill(`Read from ${d.name}: ${what}` + (filledAny ? '' : ' (form already filled — kept your values)'))
   }
   const cleanPatient = () => ({ ...patient, age: patient.age === '' ? null : Number(patient.age) })
 
@@ -113,7 +167,29 @@ export default function Analyze({ health, onDone }) {
       <div className="grid g-3" style={{ marginBottom: 16 }}>
         <Card title="Patient context" sub="Optional — symptoms raise review priority. Use anonymised IDs only.">
           <div className="grid" style={{ gap: 12 }}>
-            <label className="field">Patient ID<input className="input" placeholder="e.g. PT-2041" value={patient.patient_id} onChange={(e) => set('patient_id', e.target.value)} /></label>
+            {dictation.supported && (
+              <button type="button" className={`btn dictate-btn ${dictation.listening ? 'recording' : ''}`} onClick={dictation.toggle}
+                title="Speak the patient's details, e.g. “62-year-old man with chest pain and dizziness”. In Chrome, speech is transcribed by Google — don't say identifiable details.">
+                {dictation.listening ? <><MicOff size={15} /> Stop</> : <><Mic size={15} /> Dictate</>}
+              </button>
+            )}
+            {dictation.listening && (
+              <div className="dictation-live" role="status">
+                <span className="rec-dot" aria-hidden="true" /> Listening… {dictation.interim
+                  ? <em>“{dictation.interim}”</em>
+                  : <span className="muted">say age, sex, symptoms and anything else for the notes</span>}
+              </div>
+            )}
+            {dictation.error && <div className="autofill-note warn" role="status"><AlertTriangle size={14} /><span>{dictation.error}</span></div>}
+            {autofill && (
+              <div className="autofill-note" role="status">
+                <Info size={14} aria-hidden="true" /><span>{autofill}</span>
+                <button type="button" className="btn sm ghost" aria-label="Dismiss" onClick={() => setAutofill(null)}><X size={12} /></button>
+              </div>
+            )}
+            <label className="field">Patient ID<input className="input" placeholder="e.g. PT-2041" value={patient.patient_id}
+              onChange={(e) => set('patient_id', e.target.value)} onBlur={lookupPatient}
+              title="Returning patient? Their last known age, sex and facility are filled in" /></label>
             <div className="grid g-2" style={{ gap: 10 }}>
               <label className="field">Age<input className="input" type="number" min="0" max="120" value={patient.age} onChange={(e) => set('age', e.target.value)} /></label>
               <label className="field">Sex
@@ -129,7 +205,11 @@ export default function Analyze({ health, onDone }) {
                   aria-pressed={patient.symptoms.includes(s)} onClick={() => toggleSym(s)}>{s}</button>)}
               </div>
             </fieldset>
-            <label className="field">Referring facility<input className="input" placeholder="e.g. District Clinic A" value={patient.facility} onChange={(e) => set('facility', e.target.value)} /></label>
+            <label className="field">Referring facility
+              <input className="input" list="facility-options" placeholder={facilities.length ? 'Choose a past facility or type a new one' : 'e.g. District Clinic A'}
+                value={patient.facility} onChange={(e) => set('facility', e.target.value)} autoComplete="off" />
+              <datalist id="facility-options">{facilities.map((f) => <option key={f} value={f} />)}</datalist>
+            </label>
             <label className="field">Clinical notes<textarea className="input" rows={2} value={patient.notes} onChange={(e) => set('notes', e.target.value)} /></label>
           </div>
         </Card>
@@ -228,6 +308,13 @@ export default function Analyze({ health, onDone }) {
         </Card>
       </div>
 
+      {demo && !demo.show ? (
+        <div className="demo-hidden-note">
+          <FlaskConical size={15} aria-hidden="true" />
+          <span>The demo library of PTB-XL test ECGs is hidden while <strong>Demo data</strong> is off.</span>
+          <button className="btn sm" onClick={() => demo.setShow(true)} title="Also shows demo cases on the dashboard and in the queue">Turn demo data on</button>
+        </div>
+      ) : (
       <Card title="Demo library — unseen PTB-XL test ECGs" icon={<FlaskConical size={16} color="var(--accent)" />}
         sub="Records from fold 10, which the model never saw during training. Ground-truth cardiologist labels are shown so you can compare with the AI."
         right={
@@ -259,6 +346,7 @@ export default function Analyze({ health, onDone }) {
           </div>
         )}
       </Card>
+      )}
     </div>
   )
 }

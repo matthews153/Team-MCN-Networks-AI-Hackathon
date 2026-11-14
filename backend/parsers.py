@@ -15,6 +15,7 @@ import re
 import tempfile
 import zipfile
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 
@@ -27,6 +28,46 @@ _ALIASES.update({"avr": 3, "avl": 4, "avf": 5, "lead_i": 0, "lead_ii": 1, "lead_
 
 class ParseError(ValueError):
     pass
+
+
+_AGE_RE = re.compile(r"\bage\b[^0-9a-z]{0,4}(\d{1,3}(?:\.\d+)?)", re.I)
+_SEX_RE = re.compile(r"\b(?:sex|gender)\b[^a-z]{0,4}(male|female|man|woman|m|f)\b", re.I)
+
+
+def _norm_sex(v) -> Optional[str]:
+    v = str(v or "").strip().lower()
+    if v in ("m", "male", "man", "0"):
+        return "M"
+    if v in ("f", "female", "woman", "1"):
+        return "F"
+    return None
+
+
+def _demographics(name: str, data: bytes) -> dict:
+    """Age/sex carried inside the file, if any: WFDB header comments
+    (e.g. '# Age: 63' / '# Sex: Male', as in PhysioNet Challenge records) or JSON fields."""
+    out: dict = {}
+    ext = Path(name).suffix.lower()
+    try:
+        if ext == ".hea":
+            text = "\n".join(l.lstrip("#") for l in data.decode("utf-8", "ignore").splitlines()
+                             if l.lstrip().startswith("#"))
+            if (m := _AGE_RE.search(text)):
+                out["age"] = float(m.group(1))
+            if (m := _SEX_RE.search(text)) and _norm_sex(m.group(1)):
+                out["sex"] = _norm_sex(m.group(1))
+        elif ext == ".json":
+            obj = json.loads(data)
+            src = obj.get("patient", obj) if isinstance(obj, dict) else {}
+            if isinstance(src.get("age"), (int, float)) or str(src.get("age", "")).replace(".", "", 1).isdigit():
+                out["age"] = float(src["age"])
+            if _norm_sex(src.get("sex") or src.get("gender")):
+                out["sex"] = _norm_sex(src.get("sex") or src.get("gender"))
+    except Exception:  # noqa: BLE001 — demographics are optional
+        return {}
+    if "age" in out and not 0 < out["age"] < 120:
+        out.pop("age")
+    return out
 
 
 def _guess_fs(n: int, name: str) -> float:
@@ -149,7 +190,8 @@ def parse_files(files: list[tuple[str, bytes]]) -> list[dict]:
                 sig, fs = _parse_npy(data, name)
             else:
                 raise ParseError(f"Unsupported file type '{ext}'")
-            results.append({"name": name, "signal": sig, "fs": fs})
+            results.append({"name": name, "signal": sig, "fs": fs,
+                            "demographics": _demographics(name, data)})
         except ParseError as e:
             results.append({"name": name, "error": str(e)})
         except Exception as e:  # noqa: BLE001
@@ -162,7 +204,8 @@ def parse_files(files: list[tuple[str, bytes]]) -> list[dict]:
             continue
         try:
             sig, fs = _parse_wfdb(parts[".hea"], parts[".dat"], stem)
-            results.append({"name": stem + " (WFDB)", "signal": sig, "fs": fs})
+            results.append({"name": stem + " (WFDB)", "signal": sig, "fs": fs,
+                            "demographics": _demographics(stem + ".hea", parts[".hea"])})
         except ParseError as e:
             results.append({"name": stem, "error": str(e)})
     return results

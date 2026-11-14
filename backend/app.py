@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -49,6 +49,23 @@ for _c in CASES.values():
     _tag_demo(_c)
 
 SNAPSHOT_DIR = DATA_DIR / "snapshots"
+DOCTORS_FILE = DATA_DIR / "doctors.json"
+
+
+# --------------------------------------------------------------------------- #
+# Doctors: name-only sign-in (no passwords) — the queue is shared, uploads and
+# reviews are signed with the doctor's name. The browser sends it as X-Doctor.
+def _load_doctors() -> list[str]:
+    try:
+        return json.loads(DOCTORS_FILE.read_text()) if DOCTORS_FILE.exists() else []
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def _doctor(request: Request) -> Optional[str]:
+    from urllib.parse import unquote
+    name = unquote(request.headers.get("x-doctor", "")).strip()
+    return name[:60] or None
 
 
 def _save():
@@ -67,15 +84,17 @@ def _summary(c: dict) -> dict:
         "heart_rate": r["rhythm"].get("heart_rate"),
         "probs": {f["code"]: f["probability"] for f in r["findings"]},
         "uncertain": r["uncertain"], "ground_truth": c.get("ground_truth"),
+        "uploaded_by": c.get("uploaded_by"),
     }
 
 
 def _new_case(result: dict, patient: dict, source: str, ground_truth=None, demo=False,
-              created_at: Optional[float] = None) -> dict:
+              created_at: Optional[float] = None, uploaded_by: Optional[str] = None) -> dict:
     cid = uuid.uuid4().hex[:10]
     case = {
         "id": cid, "created_at": created_at or time.time(), "source": source,
         "patient": patient, "result": result, "ground_truth": ground_truth, "demo": demo,
+        "uploaded_by": uploaded_by,
         "review": {"status": "pending", "doctor_labels": None, "agrees": None,
                    "notes": "", "reviewed_at": None},
     }
@@ -136,7 +155,7 @@ def _patient(patient_json: Optional[str]) -> dict:
 
 
 @app.post("/api/samples/{idx}/analyze")
-def analyze_sample(idx: int, patient: Optional[str] = Form(None)):
+def analyze_sample(idx: int, request: Request, patient: Optional[str] = Form(None)):
     _require_model()
     index, sigs = _load_samples()
     if idx < 0 or idx >= len(index):
@@ -148,12 +167,13 @@ def analyze_sample(idx: int, patient: Optional[str] = Form(None)):
     p.setdefault("patient_id", f"PTBXL-{meta['ecg_id']}")
     result = engine.analyze(sigs[idx], 100, p)
     case = _new_case(result, p, f"PTB-XL test record {meta['ecg_id']}",
-                     ground_truth=meta["true_labels"], demo=True)
+                     ground_truth=meta["true_labels"], demo=True, uploaded_by=_doctor(request))
     return case
 
 
 @app.post("/api/analyze")
-async def analyze_upload(files: list[UploadFile] = File(...), patient: Optional[str] = Form(None)):
+async def analyze_upload(request: Request, files: list[UploadFile] = File(...),
+                         patient: Optional[str] = Form(None)):
     _require_model()
     p = _patient(patient)
     raw = [(f.filename or "upload", await f.read()) for f in files]
@@ -163,15 +183,21 @@ async def analyze_upload(files: list[UploadFile] = File(...), patient: Optional[
         if "error" in item:
             out.append({"name": item["name"], "error": item["error"]})
             continue
+        pp = dict(p)
+        # age/sex stored inside the file fill in whatever the form left empty
+        filled = [k for k, v in (item.get("demographics") or {}).items() if pp.get(k) in (None, "")]
+        for k in filled:
+            pp[k] = item["demographics"][k]
+        if filled:
+            pp["from_file"] = filled
         try:
-            result = engine.analyze(item["signal"], item["fs"], p)
+            result = engine.analyze(item["signal"], item["fs"], pp)
         except Exception as e:  # noqa: BLE001
             out.append({"name": item["name"], "error": f"Analysis failed: {e}"})
             continue
-        pp = dict(p)
         if len(parsed) > 1 and pp.get("patient_id"):
             pp["patient_id"] = f"{pp['patient_id']}-{len(out)+1}"
-        case = _new_case(result, pp, item["name"])
+        case = _new_case(result, pp, item["name"], uploaded_by=_doctor(request))
         out.append({"name": item["name"], "case_id": case["id"], "summary": _summary(case)})
     return out
 
@@ -196,11 +222,12 @@ class Review(BaseModel):
 
 
 @app.patch("/api/cases/{cid}/review")
-def review_case(cid: str, review: Review):
+def review_case(cid: str, review: Review, request: Request):
     if cid not in CASES:
         raise HTTPException(404, "case not found")
     with _lock:
-        CASES[cid]["review"] = {**review.model_dump(), "reviewed_at": time.time()}
+        CASES[cid]["review"] = {**review.model_dump(), "reviewed_at": time.time(),
+                                "reviewed_by": _doctor(request)}
         _save()
     return CASES[cid]
 
@@ -222,6 +249,67 @@ def clear_cases(demo_only: bool = False):
             CASES.pop(k, None)
         _save()
     return {"ok": True, "deleted": len(ids)}
+
+
+@app.get("/api/doctors")
+def list_doctors():
+    names = _load_doctors()
+    up, rv = {}, {}
+    for c in CASES.values():
+        if c.get("uploaded_by"):
+            up[c["uploaded_by"]] = up.get(c["uploaded_by"], 0) + 1
+        if (c.get("review") or {}).get("reviewed_by"):
+            rv[c["review"]["reviewed_by"]] = rv.get(c["review"]["reviewed_by"], 0) + 1
+    return [{"name": n, "uploads": up.get(n, 0), "reviews": rv.get(n, 0)} for n in names]
+
+
+class DoctorIn(BaseModel):
+    name: str
+
+
+@app.post("/api/doctors")
+def add_doctor(d: DoctorIn):
+    name = " ".join(d.name.split())[:60]
+    if not name:
+        raise HTTPException(400, "Enter a name")
+    with _lock:
+        names = _load_doctors()
+        existing = next((n for n in names if n.lower() == name.lower()), None)
+        if existing:
+            return {"name": existing, "created": False}
+        names.append(name)
+        DATA_DIR.mkdir(exist_ok=True)
+        DOCTORS_FILE.write_text(json.dumps(names))
+    return {"name": name, "created": True}
+
+
+@app.get("/api/facilities")
+def list_facilities():
+    """Referring facilities used in past cases, most used first (for suggestions)."""
+    count: dict[str, list] = {}
+    for c in CASES.values():
+        f = " ".join(str((c.get("patient") or {}).get("facility") or "").split())
+        if f:
+            k = f.lower()
+            n, last, label = count.get(k, [0, 0, f])
+            count[k] = [n + 1, max(last, c["created_at"]), label if last > c["created_at"] else f]
+    return [v[2] for v in sorted(count.values(), key=lambda v: (-v[0], -v[1]))]
+
+
+@app.get("/api/patients/{pid}")
+def lookup_patient(pid: str):
+    """Most recent details recorded for a patient ID, to pre-fill the form."""
+    pid = pid.strip().lower()
+    matches = sorted((c for c in CASES.values()
+                      if str((c.get("patient") or {}).get("patient_id") or "").strip().lower() == pid and pid),
+                     key=lambda c: -c["created_at"])
+    if not matches:
+        raise HTTPException(404, "No previous case for this patient ID")
+    info = {"patient_id": matches[0]["patient"].get("patient_id"), "case_count": len(matches),
+            "last_seen": matches[0]["created_at"]}
+    for k in ("age", "sex", "facility"):   # newest non-empty value of each field
+        info[k] = next((c["patient"].get(k) for c in matches if c["patient"].get(k) not in (None, "")), None)
+    return info
 
 
 # --------------------------------------------------------------------------- #
