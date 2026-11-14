@@ -46,7 +46,7 @@ export default function ModelInsights() {
       <div className="page-head">
         <div>
           <h2>Model insights</h2>
-          <p>How well the AI performs on {m.n.test.toLocaleString()} ECGs from PTB-XL fold 10 — patients it never saw during training. Trained {m.created}.</p>
+          <p>How well the AI performs on {m.n.test.toLocaleString('en-US')} ECGs from PTB-XL fold 10 — patients it never saw during training. Trained {m.created}.</p>
         </div>
       </div>
 
@@ -56,7 +56,7 @@ export default function ModelInsights() {
         <Kpi label="Abnormal specificity" value={pct(B.specificity, 1)} hint={`${B.confusion.fp} false alarms`} icon={<Scale size={16} />} />
         <Kpi label="Normal-vs-abnormal accuracy" value={pct(B.accuracy, 1)} hint={`majority guess: ${pct(B.majority_baseline.accuracy, 1)}`} icon={<TrendingUp size={16} />} />
         <Kpi label="Macro F1" value={num(m.ensemble.macro.f1, 3)} hint="thresholds tuned on fold 9" icon={<BrainCircuit size={16} />} />
-        <Kpi label="Training data" value={m.n.train.toLocaleString()} hint={`ECGs · ${m.ensemble_size} models × ${m.epochs} epochs`} icon={<Database size={18} />} />
+        <Kpi label="Training data" value={m.n.train.toLocaleString('en-US')} hint={`ECGs · ${m.ensemble_size} models × ${m.epochs} epochs`} icon={<Database size={18} />} />
       </div>
 
       <div className="section-heading"><h3>Overall performance</h3></div>
@@ -127,7 +127,7 @@ export default function ModelInsights() {
         ]
         return (
           <Card title="Hypertrophy safety net: voltage criteria" icon={<Ruler size={16} color="var(--accent)" />} style={{ marginBottom: 16 }}
-            sub={`Hypertrophy is the category the AI misses most. CardioLens also measures the classic LVH voltage rules on every ECG. Test set: ${V.n_hyp} hypertrophy ECGs out of ${V.n_test.toLocaleString()}.`}>
+            sub={`Hypertrophy is the category the AI misses most. CardioLens also measures the classic LVH voltage rules on every ECG. Test set: ${V.n_hyp} hypertrophy ECGs out of ${V.n_test.toLocaleString('en-US')}.`}>
             <table className="table">
               <thead><tr><th>Approach</th><th className="num">Hypertrophy caught</th><th className="num">Flags that are right (PPV)</th><th className="num">Missed</th><th className="num">False alarms</th><th>Note</th></tr></thead>
               <tbody>{rows.map((r) => (
@@ -234,13 +234,13 @@ export default function ModelInsights() {
             </LineChart>
           </ResponsiveContainer>
         </Card>
-        <Card title="Dataset composition" sub={`${m.n.total_labelled.toLocaleString()} labelled PTB-XL ECGs (labels can co-occur)`}>
+        <Card title="Dataset composition" sub={`${m.n.total_labelled.toLocaleString('en-US')} labelled PTB-XL ECGs (labels can co-occur)`}>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={derived.total} margin={{ right: 10 }}>
               <CartesianGrid {...gridProps} />
               <XAxis dataKey="name" {...axisProps} />
               <YAxis {...axisProps} width={40} />
-              <Tooltip cursor={{ fill: 'rgba(23,87,101,0.05)' }} content={<ChartTip fmt={(v) => `${v.toLocaleString()} ECGs`} />} />
+              <Tooltip cursor={{ fill: 'rgba(23,87,101,0.05)' }} content={<ChartTip fmt={(v) => `${v.toLocaleString('en-US')} ECGs`} />} />
               <Bar isAnimationActive={false} dataKey="n" name="ECGs" radius={0}>{derived.total.map((t) => <Cell key={t.code} fill={CLASS_COLORS[t.code]} />)}</Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -256,19 +256,19 @@ export default function ModelInsights() {
                 <div key={r} className="small row">{CLASS_SHORT[r].slice(0, 8)}</div>,
                 ...row.map((v, j) => (
                   <div key={r + j} className="heat-cell" style={{ height: 34, background: `rgba(24,127,142,${0.06 + 0.75 * Math.sqrt(v / mx)})` }}
-                    title={`${CLASS_NAMES[r]} & ${CLASS_NAMES[CLASSES[j]]}: ${v.toLocaleString()}`}>{v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v}</div>
+                    title={`${CLASS_NAMES[r]} & ${CLASS_NAMES[CLASSES[j]]}: ${v.toLocaleString('en-US')}`}>{v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v}</div>
                 )),
               ]
             })}
           </div>
-          <div className="small muted" style={{ marginTop: 10 }}>Sex: {m.dataset.sex_counts.M.toLocaleString()} male · {m.dataset.sex_counts.F.toLocaleString()} female</div>
+          <div className="small muted" style={{ marginTop: 10 }}>Sex: {m.dataset.sex_counts.M.toLocaleString('en-US')} male · {m.dataset.sex_counts.F.toLocaleString('en-US')} female</div>
         </Card>
       </div>
 
       <div className="section-heading"><h3>Largest test-set errors</h3></div>
-      <Card title="Cases for inspection" sub="PTB-XL reports are mostly in German.">
+      <Card title="Cases for inspection" sub="The test ECGs the AI got most wrong. Reports are shown in English, built from the cardiologist's coded statements; the original free text (often German or Swedish) is one click away.">
         <table className="table">
-          <thead><tr><th>ECG</th><th>Patient</th><th>Cardiologist label</th><th>AI prediction</th><th>Original report</th><th /></tr></thead>
+          <thead><tr><th>ECG</th><th>Patient</th><th>Cardiologist label</th><th>AI prediction</th><th>Cardiologist's report</th><th /></tr></thead>
           <tbody>{m.failures.slice(0, 12).map((f) => {
             const s = sampleById[f.ecg_id]
             return (
@@ -277,7 +277,12 @@ export default function ModelInsights() {
                 <td className="small">{Math.round(f.age)}y {f.sex}</td>
                 <td>{f.true.map((c) => <ClassTag key={c} code={c} />)}</td>
                 <td>{f.pred.length ? f.pred.map((c) => <ClassTag key={c} code={c} />) : <span className="muted small">none</span>}</td>
-                <td className="small muted" style={{ maxWidth: 360 }}>{f.report}</td>
+                <td className="small" style={{ maxWidth: 380 }}>
+                  <div className="text-2">{f.report_en || f.report}</div>
+                  {f.report_en && f.report_lang && f.report_lang !== 'English' && (
+                    <details className="orig-report"><summary>Original wording ({f.report_lang})</summary><span lang={f.report_lang === 'German' ? 'de' : 'sv'}>{f.report}</span></details>
+                  )}
+                </td>
                 <td>{s && <button className="btn sm" onClick={async () => { const c = await api.analyzeSample(s.idx); navigate(`#/case/${c.id}`) }}>Inspect</button>}</td>
               </tr>
             )
@@ -291,7 +296,7 @@ export default function ModelInsights() {
 function Cm({ v, label, tone }) {
   return (
     <div className={`confusion-cell ${tone}`}>
-      <div style={{ fontSize: 22, fontWeight: 650 }}>{v.toLocaleString()}</div>
+      <div style={{ fontSize: 22, fontWeight: 650 }}>{v.toLocaleString('en-US')}</div>
       <div className="small text-2">{label}</div>
     </div>
   )

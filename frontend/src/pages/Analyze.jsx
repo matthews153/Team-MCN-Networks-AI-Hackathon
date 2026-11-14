@@ -284,7 +284,7 @@ export default function Analyze({ health, demo, onDone }) {
             <div className="last-upload">
               <div className="row between">
                 <div>
-                  <h3 style={{ fontSize: 13, margin: 0 }}>Last upload · {new Date(last.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</h3>
+                  <h3 style={{ fontSize: 13, margin: 0 }}>Last upload · {new Date(last.at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</h3>
                   <div className="muted small">Click a result to open it. These cases are also in the review queue.</div>
                 </div>
                 <button className="btn sm ghost" onClick={clearLast} title="Removes this list only — the cases stay in the review queue">

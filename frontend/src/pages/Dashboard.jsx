@@ -31,7 +31,7 @@ export default function Dashboard({ cases, demo, health, onChange }) {
       const d0 = today.getTime() / 1000 - i * DAY
       const inDay = scoped.filter((c) => c.created_at >= d0 && c.created_at < d0 + DAY)
       days.push({
-        day: new Date(d0 * 1000).toLocaleDateString([], { weekday: 'short', day: 'numeric' }),
+        day: new Date(d0 * 1000).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' }),
         urgent: inDay.filter((c) => c.triage.level === 'urgent').length,
         priority: inDay.filter((c) => c.triage.level === 'priority').length,
         routine: inDay.filter((c) => c.triage.level === 'routine').length,
@@ -154,7 +154,7 @@ export default function Dashboard({ cases, demo, health, onChange }) {
               )
             })}
           </div>
-          <div className="priority-total">{total.toLocaleString()} ECGs in this period</div>
+          <div className="priority-total">{total.toLocaleString('en-US')} ECGs in this period</div>
         </Card>
       </div>
 

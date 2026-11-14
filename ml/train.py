@@ -27,7 +27,7 @@ from sklearn.preprocessing import StandardScaler
 
 from .config import (ARTIFACTS_DIR, CLASSES, LEADS, TEST_FOLD,
                      TRAIN_FOLDS, VAL_FOLD, SAMPLING_RATE)
-from .data import load_metadata, load_raw_signals
+from .data import english_report, load_metadata, load_raw_signals, report_language
 from .model import ResNet1d
 from .preprocess import bandpass, standardize
 
@@ -338,7 +338,9 @@ def main():
                          "probs": {c: float(Pte[i, j]) for j, c in enumerate(CLASSES)},
                          "age": float(te_meta["age"].iloc[i]),
                          "sex": "F" if te_meta["sex"].iloc[i] == 1 else "M",
-                         "report": str(te_meta["report"].iloc[i])})
+                         "report": str(te_meta["report"].iloc[i]),
+                         "report_en": english_report(te_meta["scp_codes"].iloc[i]),
+                         "report_lang": report_language(str(te_meta["report"].iloc[i]))})
 
     # dataset analytics
     cooc = (Y_all.T @ Y_all).astype(int).tolist()
@@ -393,7 +395,9 @@ def main():
                       "sex": "F" if te_meta["sex"].iloc[i] == 1 else "M",
                       "true_labels": [c for j, c in enumerate(CLASSES) if Yte[i, j] == 1],
                       "is_failure_case": bool(i in fail_idx[:8]),
-                      "report": str(te_meta["report"].iloc[i])})
+                      "report": str(te_meta["report"].iloc[i]),
+                      "report_en": english_report(te_meta["scp_codes"].iloc[i]),
+                      "report_lang": report_language(str(te_meta["report"].iloc[i]))})
     with open(ARTIFACTS_DIR / "samples.json", "w") as f:
         json.dump(index, f)
     print(f"Saved {len(chosen)} demo samples. Done.")

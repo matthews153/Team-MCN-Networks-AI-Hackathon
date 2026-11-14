@@ -20,7 +20,7 @@ export function useDictation(onFinalText) {
   const start = () => {
     if (!Rec || listening) return
     const r = new Rec()
-    r.lang = navigator.language || 'en-US'
+    r.lang = 'en-US'   // always transcribe in English (the app and its parsing are English)
     r.continuous = true
     r.interimResults = true
     r.onresult = (e) => {

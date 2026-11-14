@@ -51,3 +51,43 @@ def load_raw_signals(df: pd.DataFrame) -> np.ndarray:
     np.save(cache, sigs)
     np.save(ids_cache, df.index.values)
     return sigs
+
+
+# --------------------------------------------------------------------------- #
+# English versions of the cardiologists' reports
+# PTB-XL free-text reports are mostly German (some Swedish). Every report is also coded
+# into standard SCP-ECG statements with English descriptions and a likelihood, so the
+# English report is built from those codes rather than machine-translated.
+_SCP_TEXT: dict | None = None
+_CERTAINTY = {15: "unlikely", 35: "possible", 50: "possible", 80: "probable"}
+
+
+def english_report(scp_codes: dict) -> str:
+    """e.g. {'LVH': 50, 'ABQRS': 0, 'SR': 0} -> 'Possible left ventricular hypertrophy; abnormal QRS; sinus rhythm.'"""
+    global _SCP_TEXT
+    if _SCP_TEXT is None:
+        s = pd.read_csv(PTBXL_DIR / "scp_statements.csv", index_col=0)
+        _SCP_TEXT = {code: (str(row["description"]), 0 if row.get("diagnostic") == 1 else
+                            1 if row.get("form") == 1 else 2) for code, row in s.iterrows()}
+    items = []
+    for code, lik in scp_codes.items():
+        desc, kind = _SCP_TEXT.get(code, (code, 3))
+        lik = int(lik or 0)
+        qual = _CERTAINTY.get(lik) if kind == 0 else None   # likelihood is only given for diagnoses
+        items.append((kind, -lik, f"{qual} {desc}" if qual else desc))
+    parts = [t for _, _, t in sorted(items)]
+    text = "; ".join(parts)
+    return (text[:1].upper() + text[1:] + ".") if text else ""
+
+
+def report_language(text: str) -> str:
+    """Rough language of a PTB-XL free-text report: English, German or Swedish."""
+    t = (text or "").lower()
+    swedish = ("sinusrytm", "förlopp", "fÖrlopp", "vänster", "vÄnster", "avvikande", "el-axel", "kammar", "förmak")
+    german = ("sinusrhythmus", "lagetyp", "normales", "ekg", "moeglich", "möglich", "mÖglich", "linkshypertrophie",
+              "vorhof", "leitungsstoerung", "infarkt", "st-strecke", "rechtsschenkel", "linksschenkel")
+    if any(w.lower() in t for w in swedish):
+        return "Swedish"
+    if any(w.lower() in t for w in german):
+        return "German"
+    return "English"

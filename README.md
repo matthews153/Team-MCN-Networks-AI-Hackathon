@@ -138,6 +138,7 @@ unzip ptbxl.zip && rm ptbxl.zip && cd ..
 ### Limitations
 * PTB-XL labels describe ECG findings, not urgency or outcomes, so the priority rule is a transparent heuristic, not a validated risk model.
 * Voltage criteria are a rule of thumb: they miss many cases of hypertrophy, and healthy young, thin or athletic people can meet them.
+* PTB-XL's free-text reports are mostly German (some Swedish). CardioLens shows them in English, built from the cardiologists' coded SCP-ECG statements (`ml/data.py: english_report`), not machine-translated; the original wording is available on click. To add this to existing artifacts, run `python -m ml.english_reports`.
 * Data comes from a single German source (1989–1996), so generalisation to other devices and populations is untested.
 * Photos and scans of paper ECGs are not supported yet; only digital waveforms are.
 

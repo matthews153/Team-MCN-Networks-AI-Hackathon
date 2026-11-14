@@ -588,3 +588,6 @@ div.field { display: flex; flex-direction: column; gap: 6px; }
 .voltage-pill { padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: var(--surface-3); color: var(--text-2); }
 .voltage-pill.met { background: #fdf1d8; color: #7a5310; }
 .voltage-pill.borderline { background: #fbf4e4; color: #7a5310; }
+.orig-report { margin-top: 4px; color: var(--muted); }
+.orig-report summary { cursor: pointer; font-size: 11px; }
+.orig-report span { display: block; margin-top: 3px; font-style: italic; }
