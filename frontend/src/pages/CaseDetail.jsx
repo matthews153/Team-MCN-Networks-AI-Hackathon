@@ -158,20 +158,22 @@ export default function CaseDetail({ id, onChange }) {
 
       <div className="grid g-3" style={{ marginBottom: 16 }}>
         <Card title="Lead importance" sub="Share of model attribution per lead, for each category. Darker = more influential." className="span-2">
-          <div style={{ display: 'grid', gridTemplateColumns: `90px repeat(12, 1fr)`, gap: 3 }}>
-            <div />
-            {LEADS.map((l) => <div key={l} className="small muted" style={{ textAlign: 'center' }}>{l}</div>)}
-            {CLASSES.map((cl) => {
-              const row = r.lead_importance[cl]
-              const mx = Math.max(...row)
-              return [
-                <div key={cl} className="small row" style={{ gap: 6 }}><span className="cls-dot" style={{ background: CLASS_COLORS[cl] }} />{CLASS_SHORT[cl]}</div>,
-                ...row.map((v, i) => (
-                  <div key={cl + i} className="heat-cell" title={`${CLASS_NAMES[cl]} · ${LEADS[i]}: ${(v * 100).toFixed(1)}%`}
-                    style={{ background: `rgba(24,127,142,${0.08 + 0.75 * (v / mx)})` }}>{(v * 100).toFixed(0)}</div>
-                )),
-              ]
-            })}
+          <div className="heatmap-scroll">
+            <div className="lead-heatmap">
+              <div />
+              {LEADS.map((l) => <div key={l} className="small muted" style={{ textAlign: 'center' }}>{l}</div>)}
+              {CLASSES.map((cl) => {
+                const row = r.lead_importance[cl]
+                const mx = Math.max(...row)
+                return [
+                  <div key={cl} className="small row" style={{ gap: 6 }}><span className="cls-dot" style={{ background: CLASS_COLORS[cl] }} />{CLASS_SHORT[cl]}</div>,
+                  ...row.map((v, i) => (
+                    <div key={cl + i} className="heat-cell" title={`${CLASS_NAMES[cl]} · ${LEADS[i]}: ${(v * 100).toFixed(1)}%`}
+                      style={{ background: `rgba(24,127,142,${0.08 + 0.75 * (v / mx)})` }}>{(v * 100).toFixed(0)}</div>
+                  )),
+                ]
+              })}
+            </div>
           </div>
         </Card>
         <Card title="Signal quality by lead" sub={r.quality.issues.length ? `${r.quality.issues.length} issue(s) detected` : 'No quality issues detected'}>
