@@ -83,16 +83,7 @@ export default function App() {
     <div className="app">
       <aside className={`sidebar ${navOpen ? 'nav-open' : ''}`}>
         <div className="brand">
-          <div className="brand-logo" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="9" />
-              <path d="M3.5 12h4l2-4 3.2 8 2.1-4H20.5" />
-            </svg>
-          </div>
-          <div>
-            <h1>CardioLens</h1>
-            <small>ECG triage workstation</small>
-          </div>
+          <h1>CardioLens</h1>
         </div>
         <nav id="primary-navigation" className={`nav-list ${navOpen ? 'open' : ''}`} aria-label="Primary navigation">
           {NAV.map((n) => {
