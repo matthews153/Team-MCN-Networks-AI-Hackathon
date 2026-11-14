@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Download, FlaskConical, Search, Trash2 } from 'lucide-react'
+import { Download, FlaskConical, RotateCcw, Search, Trash2 } from 'lucide-react'
 import { api, CLASSES, CLASS_COLORS, CLASS_SHORT, TRIAGE, fmtDate, navigate } from '../lib'
 import { Card, Findings, TriageBadge } from '../components/ui'
 
@@ -10,6 +10,7 @@ export default function Queue({ cases, demo, doctor, onChange }) {
   const [q, setQ] = useState('')
   const [sort, setSort] = useState('priority')
   const [who, setWho] = useState('all')
+  const [resetting, setResetting] = useState(false)
 
   // Reading order among the cases currently shown (demo toggle respected): most urgent first,
   // ties broken by who has waited longest. The 0–100 score itself is per patient and never changes.
@@ -45,6 +46,11 @@ export default function Queue({ cases, demo, doctor, onChange }) {
       : 'Delete ALL cases? This cannot be undone.'
     if (confirm(msg)) { await api.clear(); onChange?.() }
   }
+  const resetDemo = async () => {
+    if (!confirm('Reset demo cases to the original setup?\n\nAll demo cases (and any reviews or edits made on them) are replaced with the standard 24 demo patients. Real patient cases are kept.')) return
+    setResetting(true)
+    try { await api.resetDemo(); demo?.setShow(true); await onChange?.() } catch (e) { alert(`Could not reset demo cases: ${e.message}`) } finally { setResetting(false) }
+  }
   const clearDemo = async () => {
     if (confirm(`Remove ${demo.count} demo case${demo.count === 1 ? '' : 's'}? Real patient cases are kept.`)) {
       await api.clearDemo(); onChange?.()
@@ -60,6 +66,10 @@ export default function Queue({ cases, demo, doctor, onChange }) {
         </div>
         <div className="row">
           <button className="btn" onClick={exportCsv}><Download size={15} /> Export CSV</button>
+          <button className="btn" onClick={resetDemo} disabled={resetting}
+            title="Replace all demo cases with the original 24 demo patients. Real patient cases are kept.">
+            {resetting ? <span className="spinner" /> : <RotateCcw size={15} />} Reset demo cases
+          </button>
           {demo?.count > 0 && <button className="btn" onClick={clearDemo}><FlaskConical size={15} /> Remove demo cases</button>}
           <button className="btn danger ghost" onClick={clearAll}><Trash2 size={15} /> Clear all</button>
         </div>
