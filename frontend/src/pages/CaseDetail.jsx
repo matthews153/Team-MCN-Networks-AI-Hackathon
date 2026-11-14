@@ -145,11 +145,11 @@ export default function CaseDetail({ id, onChange }) {
         <Card title="Probability profile" sub="Ensemble output vs. thresholds (%)">
           <ResponsiveContainer width="100%" height={260}>
             <RadarChart data={radar} outerRadius="72%">
-              <PolarGrid stroke="#2a2f3a" />
-              <PolarAngleAxis dataKey="name" tick={{ fill: '#b6bcc8', fontSize: 11 }} />
+              <PolarGrid stroke="var(--grid)" />
+              <PolarAngleAxis dataKey="name" tick={{ fill: 'var(--text-2)', fontSize: 11 }} />
               <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
-              <Radar isAnimationActive={false} name="Threshold" dataKey="threshold" stroke="#8a909c" strokeDasharray="4 3" fill="none" strokeWidth={1.5} />
-              <Radar isAnimationActive={false} name="Probability" dataKey="probability" stroke="#45b8c8" fill="#45b8c8" fillOpacity={0.25} strokeWidth={2} />
+              <Radar isAnimationActive={false} name="Threshold" dataKey="threshold" stroke="var(--axis)" strokeDasharray="4 3" fill="none" strokeWidth={1.5} />
+              <Radar isAnimationActive={false} name="Probability" dataKey="probability" stroke="var(--accent)" fill="var(--accent)" fillOpacity={0.25} strokeWidth={2} />
               <Tooltip content={<ChartTip fmt={(v) => `${v}%`} />} />
             </RadarChart>
           </ResponsiveContainer>
@@ -168,7 +168,7 @@ export default function CaseDetail({ id, onChange }) {
                 <div key={cl} className="small row" style={{ gap: 6 }}><span className="cls-dot" style={{ background: CLASS_COLORS[cl] }} />{CLASS_SHORT[cl]}</div>,
                 ...row.map((v, i) => (
                   <div key={cl + i} className="heat-cell" title={`${CLASS_NAMES[cl]} · ${LEADS[i]}: ${(v * 100).toFixed(1)}%`}
-                    style={{ background: `rgba(69,184,200,${0.08 + 0.75 * (v / mx)})` }}>{(v * 100).toFixed(0)}</div>
+                    style={{ background: `rgba(24,127,142,${0.08 + 0.75 * (v / mx)})` }}>{(v * 100).toFixed(0)}</div>
                 )),
               ]
             })}
