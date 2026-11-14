@@ -73,19 +73,27 @@ def build_needed() -> bool:
     return not DIST_INDEX.is_file() or DIST_INDEX.stat().st_mtime < newest_source_mtime()
 
 
+def run_npm(*args: str) -> None:
+    npm = shutil.which("npm.cmd" if os.name == "nt" else "npm")
+    if npm is None:
+        raise RuntimeError("npm was not found. Install Node.js 18+, then run this file again.")
+    command = subprocess.list2cmdline([npm, *args]) if os.name == "nt" else [npm, *args]
+    subprocess.run(command, cwd=FRONTEND, check=True, shell=os.name == "nt")
+
+
 def ensure_node_modules() -> None:
-    if not shutil.which("node") or not shutil.which("npm"):
+    if not shutil.which("node") or not shutil.which("npm.cmd" if os.name == "nt" else "npm"):
         raise RuntimeError("Node.js is required to build the dashboard. Install Node.js 18+, "
                            "then run this file again.")
     if not VITE.is_file():
         print("Installing frontend dependencies (first run only)...")
-        subprocess.run(["npm", "ci", "--no-audit", "--no-fund"], cwd=FRONTEND, check=True)
+        run_npm("ci", "--no-audit", "--no-fund")
 
 
 def build_frontend() -> None:
     ensure_node_modules()
     print("Building the dashboard...")
-    subprocess.run(["npm", "run", "build"], cwd=FRONTEND, check=True)
+    run_npm("run", "build")
 
 
 def check_python_deps() -> None:
