@@ -9,6 +9,7 @@ import random
 import threading
 import time
 import uuid
+import os
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -28,6 +29,9 @@ app = FastAPI(title="CardioLens API", version="1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 engine = Engine()
+# Where cases, doctors and snapshots are stored. CARDIOLENS_DATA_DIR lets a second instance
+# (e.g. for recording a demo) run with its own, separate data.
+DATA_DIR = Path(os.environ.get("CARDIOLENS_DATA_DIR", DATA_DIR))
 CASES_FILE = DATA_DIR / "cases.json"
 _lock = threading.Lock()
 CASES: dict[str, dict] = {}
@@ -101,7 +105,7 @@ def _doctor(request: Request) -> Optional[str]:
 
 
 def _save():
-    DATA_DIR.mkdir(exist_ok=True)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     CASES_FILE.write_text(json.dumps(list(CASES.values())))
 
 
@@ -348,7 +352,7 @@ def add_doctor(d: DoctorIn):
 
 
 def _save_doctors(names: list[str]) -> None:
-    DATA_DIR.mkdir(exist_ok=True)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     DOCTORS_FILE.write_text(json.dumps(names))
 
 
