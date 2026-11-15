@@ -171,7 +171,7 @@ def _load_samples():
 # --------------------------------------------------------------------------- #
 # Bump when the API gains or changes endpoints; the dashboard checks it (frontend/src/lib.js)
 # so an old server process left running after a `git pull` is reported clearly.
-API_VERSION = 5
+API_VERSION = 6
 
 
 @app.get("/api/health")
@@ -311,9 +311,10 @@ def delete_case(cid: str):
 
 @app.delete("/api/cases")
 def clear_cases(demo_only: bool = False):
-    """Delete all cases, or with ?demo_only=true only the demo/synthetic ones."""
+    """Delete the real (non-demo) patient cases; demo cases are always kept.
+    With ?demo_only=true it does the opposite: delete only the demo/synthetic cases."""
     with _lock:
-        ids = [k for k, c in CASES.items() if c.get("demo")] if demo_only else list(CASES)
+        ids = [k for k, c in CASES.items() if bool(c.get("demo")) == demo_only]
         for k in ids:
             CASES.pop(k, None)
         _save()
