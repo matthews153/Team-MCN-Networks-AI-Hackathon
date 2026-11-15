@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AlertCircle, BrainCircuit, FlaskConical, Info, LogOut, ShieldAlert, UserRound, LayoutDashboard, ListChecks, Menu, Upload, X } from 'lucide-react'
+import { AlertCircle, BrainCircuit, FlaskConical, Info, LogOut, Settings2, ShieldAlert, UserRound, LayoutDashboard, ListChecks, Menu, Upload, X } from 'lucide-react'
 import { api, getDoctor, serverOutdated, setDoctor } from './lib'
 import SignIn from './pages/SignIn'
 import OutdatedServer from './components/OutdatedServer'
@@ -9,6 +9,7 @@ import Queue from './pages/Queue'
 import CaseDetail from './pages/CaseDetail'
 import ModelInsights from './pages/ModelInsights'
 import About from './pages/About'
+import Settings from './pages/Settings'
 
 const NAV = [
   { hash: '#/', label: 'Dashboard', icon: LayoutDashboard },
@@ -16,7 +17,42 @@ const NAV = [
   { hash: '#/queue', label: 'Review queue', icon: ListChecks, badge: true },
   { hash: '#/model', label: 'Model insights', icon: BrainCircuit },
   { hash: '#/about', label: 'About & limits', icon: Info },
+  { hash: '#/settings', label: 'Settings', icon: Settings2 },
 ]
+const THEMES = ['clinical', 'bright', 'midnight', 'sage']
+
+function storedRange(key, fallback, max = 100) {
+  const saved = localStorage.getItem(key)
+  if (saved === 'comfortable') return 0
+  if (saved === 'compact') return 100
+  if (saved === null || saved === '') return fallback
+  const value = Number(saved)
+  return Number.isFinite(value) ? Math.max(0, Math.min(max, value)) : fallback
+}
+
+function storedDensity() {
+  const saved = localStorage.getItem('cardiolens.density')
+  const currentScale = localStorage.getItem('cardiolens.density.version') === '2'
+  if (saved === 'comfortable') return 100
+  if (saved === 'compact') return 0
+  if (saved === null || saved === '') return 100
+  const value = Number(saved)
+  if (!Number.isFinite(value)) return 100
+  return currentScale
+    ? Math.max(0, Math.min(200, value))
+    : Math.max(0, Math.min(100, 100 - value))
+}
+
+function loadDisplaySettings() {
+  const savedTheme = localStorage.getItem('cardiolens.theme')
+  const oldBrightness = localStorage.getItem('cardiolens.brightness')
+  const legacyTheme = { bright: 'bright', dark: 'midnight', soft: 'sage', balanced: 'clinical', normal: 'clinical' }
+  return {
+    brightness: storedRange('cardiolens.brightness', 50),
+    theme: THEMES.includes(savedTheme) ? savedTheme : legacyTheme[oldBrightness] || 'clinical',
+    density: storedDensity(),
+  }
+}
 
 function useHash() {
   const [hash, setHash] = useState(window.location.hash || '#/')
@@ -40,6 +76,36 @@ export default function App() {
   // Demo / synthetic cases can be hidden so only real patients are shown (remembered per browser)
   const [showDemo, setShowDemoState] = useState(() => localStorage.getItem('cardiolens.showDemo') !== 'false')
   const setShowDemo = useCallback((v) => { localStorage.setItem('cardiolens.showDemo', String(v)); setShowDemoState(v) }, [])
+  const [displaySettings, setDisplaySettings] = useState(loadDisplaySettings)
+  const updateDisplaySetting = (key, value) => {
+    localStorage.setItem(`cardiolens.${key}`, value)
+    if (key === 'density') localStorage.setItem('cardiolens.density.version', '2')
+    setDisplaySettings((current) => ({ ...current, [key]: value }))
+  }
+  useEffect(() => {
+    const root = document.documentElement
+    root.dataset.theme = displaySettings.theme
+    root.dataset.brightnessSide = displaySettings.brightness < 50 ? 'down' : 'up'
+    root.style.setProperty('--brightness-adjust', `${Math.abs(displaySettings.brightness - 50) * 0.3}%`)
+    const spacing = displaySettings.density
+    const setSpacing = (name, compact, standard) => {
+      const value = spacing <= 100
+        ? compact + (standard - compact) * spacing / 100
+        : standard * (1 + (spacing - 100) / 100)
+      root.style.setProperty(name, `${value}px`)
+    }
+    setSpacing('--density-gap', 10, 16)
+    setSpacing('--density-card-y', 12, 18)
+    setSpacing('--density-card-x', 16, 20)
+    setSpacing('--density-header-gap', 9, 13)
+    setSpacing('--density-header-pad', 8, 10)
+    setSpacing('--density-table-y', 6, 10)
+    setSpacing('--density-table-x', 9, 11)
+    setSpacing('--density-kpi-y', 10, 14)
+    setSpacing('--density-kpi-x', 12, 15)
+    setSpacing('--density-nav-height', 40, 44)
+    setSpacing('--density-nav-y', 8, 10)
+  }, [displaySettings])
 
   useEffect(() => {
     if (!navOpen) return
@@ -77,6 +143,7 @@ export default function App() {
   else if (hash.startsWith('#/queue')) page = <Queue cases={visibleCases} demo={demo} doctor={doctor} onChange={refresh} />
   else if (hash.startsWith('#/model')) page = <ModelInsights />
   else if (hash.startsWith('#/about')) page = <About />
+  else if (hash.startsWith('#/settings')) page = <Settings display={displaySettings} onChange={updateDisplaySetting} />
   else page = <Dashboard cases={visibleCases} demo={demo} health={health} onChange={refresh} />
 
   return (
@@ -93,7 +160,7 @@ export default function App() {
               <button key={n.hash} className={`nav-item ${active ? 'active' : ''}`}
                 aria-current={active ? 'page' : undefined}
                 onClick={() => { window.location.hash = n.hash; setNavOpen(false) }}>
-                <Icon size={17} strokeWidth={1.8} /> <span>{n.label}</span>
+                <Icon size={18} strokeWidth={1.8} /> <span>{n.label}</span>
                 {n.badge && urgentPending > 0 && <span className="nav-badge">{urgentPending}</span>}
               </button>
             )

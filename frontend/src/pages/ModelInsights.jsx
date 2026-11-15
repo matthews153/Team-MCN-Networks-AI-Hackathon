@@ -6,7 +6,7 @@ import { AlertTriangle, BrainCircuit, Database, Ruler, Scale, Target, TrendingUp
 import { api, CLASSES, CLASS_COLORS, CLASS_NAMES, CLASS_SHORT, navigate, num, pct } from '../lib'
 import { axisProps, Card, ChartTip, ClassTag, ErrorState, gridProps, Kpi, Legend } from '../components/ui'
 
-const SEQ = ['#557f8b', '#84704d', '#527451', '#73628a']
+const SEQ = ['var(--model-1)', 'var(--model-2)', 'var(--model-3)', 'var(--model-4)']
 
 export default function ModelInsights() {
   const [m, setM] = useState(null)
@@ -68,9 +68,9 @@ export default function ModelInsights() {
               <XAxis type="number" domain={[0, 1]} {...axisProps} />
               <YAxis type="category" dataKey="short" {...axisProps} width={130} />
               <ReferenceLine x={0.5} stroke="var(--axis)" strokeDasharray="4 3" />
-              <Tooltip cursor={{ fill: 'rgba(23,87,101,0.05)' }} content={<ChartTip fmt={(v) => num(v, 3)} />} />
+              <Tooltip cursor={{ fill: 'var(--chart-hover)' }} content={<ChartTip fmt={(v) => num(v, 3)} />} />
               <Bar isAnimationActive={false} dataKey="auroc" name="Macro AUROC" radius={0} barSize={22} label={{ position: 'right', fill: 'var(--text-2)', fontSize: 11, formatter: (v) => num(v, 3) }}>
-                {derived.comp.map((c, i) => <Cell key={i} fill={i === 3 ? 'var(--accent)' : '#607680'} />)}
+                {derived.comp.map((c, i) => <Cell key={i} fill={i === 3 ? 'var(--accent)' : 'var(--chart-muted)'} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -171,11 +171,11 @@ export default function ModelInsights() {
               <XAxis type="number" {...axisProps} tickFormatter={(v) => Math.abs(v)} />
               <YAxis type="category" dataKey="name" {...axisProps} width={84} />
               <ReferenceLine x={0} stroke="var(--axis)" />
-              <Tooltip cursor={{ fill: 'rgba(23,87,101,0.05)' }} content={<ChartTip fmt={(v) => Math.abs(v)} />} />
-              <Bar isAnimationActive={false} dataKey="missed" name="Missed (FN)" stackId="s" barSize={22} radius={0} label={{ position: 'insideLeft', fill: '#172a33', fontSize: 11, formatter: (v) => Math.abs(v) }}>
+              <Tooltip cursor={{ fill: 'var(--chart-hover)' }} content={<ChartTip fmt={(v) => Math.abs(v)} />} />
+              <Bar isAnimationActive={false} dataKey="missed" name="Missed (FN)" stackId="s" barSize={22} radius={0} label={{ position: 'insideLeft', fill: 'var(--bar-label)', fontSize: 11, formatter: (v) => Math.abs(v) }}>
                 {derived.errors.map((e) => <Cell key={e.code} fill={CLASS_COLORS[e.code]} />)}
               </Bar>
-              <Bar isAnimationActive={false} dataKey="false_alarms" name="False alarms (FP)" stackId="s" barSize={22} radius={0} label={{ position: 'insideRight', fill: '#172a33', fontSize: 11 }}>
+              <Bar isAnimationActive={false} dataKey="false_alarms" name="False alarms (FP)" stackId="s" barSize={22} radius={0} label={{ position: 'insideRight', fill: 'var(--bar-label)', fontSize: 11 }}>
                 {derived.errors.map((e) => <Cell key={e.code} fill={CLASS_COLORS[e.code]} fillOpacity={0.5} />)}
               </Bar>
             </BarChart>
@@ -191,7 +191,7 @@ export default function ModelInsights() {
               <CartesianGrid {...gridProps} />
               <XAxis dataKey="group" {...axisProps} />
               <YAxis domain={[0.5, 1]} {...axisProps} width={34} />
-              <Tooltip cursor={{ fill: 'rgba(23,87,101,0.05)' }} content={<ChartTip fmt={(v) => num(v, 3)} />} />
+              <Tooltip cursor={{ fill: 'var(--chart-hover)' }} content={<ChartTip fmt={(v) => num(v, 3)} />} />
               <Bar isAnimationActive={false} dataKey="macro_auroc" name="Macro AUROC" fill="var(--accent)" radius={0} barSize={30} label={{ position: 'top', fill: 'var(--muted)', fontSize: 10, formatter: (v) => num(v, 2) }} />
             </BarChart>
           </ResponsiveContainer>
@@ -240,7 +240,7 @@ export default function ModelInsights() {
               <CartesianGrid {...gridProps} />
               <XAxis dataKey="name" {...axisProps} />
               <YAxis {...axisProps} width={40} />
-              <Tooltip cursor={{ fill: 'rgba(23,87,101,0.05)' }} content={<ChartTip fmt={(v) => `${v.toLocaleString('en-US')} ECGs`} />} />
+              <Tooltip cursor={{ fill: 'var(--chart-hover)' }} content={<ChartTip fmt={(v) => `${v.toLocaleString('en-US')} ECGs`} />} />
               <Bar isAnimationActive={false} dataKey="n" name="ECGs" radius={0}>{derived.total.map((t) => <Cell key={t.code} fill={CLASS_COLORS[t.code]} />)}</Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -255,7 +255,7 @@ export default function ModelInsights() {
               return [
                 <div key={r} className="small row">{CLASS_SHORT[r].slice(0, 8)}</div>,
                 ...row.map((v, j) => (
-                  <div key={r + j} className="heat-cell" style={{ height: 34, background: `rgba(24,127,142,${0.06 + 0.75 * Math.sqrt(v / mx)})` }}
+                  <div key={r + j} className="heat-cell" style={{ height: 34, background: `rgba(var(--heat-rgb),${0.06 + 0.75 * Math.sqrt(v / mx)})` }}
                     title={`${CLASS_NAMES[r]} & ${CLASS_NAMES[CLASSES[j]]}: ${v.toLocaleString('en-US')}`}>{v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v}</div>
                 )),
               ]
