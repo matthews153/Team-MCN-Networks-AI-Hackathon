@@ -160,7 +160,7 @@ def _load_samples():
 # --------------------------------------------------------------------------- #
 # Bump when the API gains or changes endpoints; the dashboard checks it (frontend/src/lib.js)
 # so an old server process left running after a `git pull` is reported clearly.
-API_VERSION = 4
+API_VERSION = 5
 
 
 @app.get("/api/health")
@@ -504,6 +504,21 @@ def seed_demo(n: int = 24):
     with _lock:
         _save()
     return {"ok": True, "count": len(picks)}
+
+
+@app.post("/api/demo/reset")
+def reset_demo(n: int = 24):
+    """Put the demo cases back to their original setup: remove every demo case (including
+    demo-library analyses and any reviews made on them) and re-create the standard demo
+    patients. Real patient cases are not touched."""
+    _require_model()
+    with _lock:
+        demo_ids = [k for k, c in CASES.items() if c.get("demo")]
+        for k in demo_ids:
+            CASES.pop(k)
+        _save()
+    res = seed_demo(n)
+    return {"ok": True, "removed": len(demo_ids), "created": res["count"]}
 
 
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])

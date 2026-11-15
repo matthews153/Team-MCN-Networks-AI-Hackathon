@@ -39,7 +39,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 | `python Main.py --rebuild` | force a fresh dashboard build |
 | `python Main.py --port 9000 --no-browser` | different port, don't open a browser |
 
-**Demo data:** *Load demo cases* on the empty dashboard creates 24 synthetic patients from unseen PTB-XL test ECGs; they are tagged **Demo**. The **Demo data** switch in the sidebar hides or shows them, so only real uploads are left on the dashboard and in the queue. **Remove demo cases** in the review queue deletes only the demo cases and keeps real patients.
+**Demo data:** *Load demo cases* on the empty dashboard creates 24 synthetic patients from unseen PTB-XL test ECGs; they are tagged **Demo**. The **Demo data** switch in the sidebar hides or shows them, so only real uploads are left on the dashboard and in the queue. **Remove demo cases** in the review queue deletes only the demo cases and keeps real patients. **Reset demo cases** puts the demo back to its original setup (the same 24 demo patients every time), again keeping real patients.
 
 **Snapshots (save and bring back case lists):** cases live in `data/cases.json`. Named copies are kept in `data/snapshots/`, which is local only and not committed.
 

@@ -18,7 +18,7 @@ export const SYMPTOMS = ['chest pain', 'shortness of breath', 'palpitations', 'd
 
 // The server API version this dashboard needs (backend/app.py API_VERSION). An older server
 // process still running after a `git pull` is detected and reported instead of failing oddly.
-export const REQUIRED_API = 4
+export const REQUIRED_API = 5
 export const serverOutdated = (health) => !!health && (health.api_version ?? 0) < REQUIRED_API
 
 // Name-only sign-in: the chosen doctor is remembered per browser and sent with every request
@@ -62,6 +62,7 @@ export const api = {
   clear: () => req('/api/cases', { method: 'DELETE' }),
   clearDemo: () => req('/api/cases?demo_only=true', { method: 'DELETE' }),
   seed: () => req('/api/demo/seed', { method: 'POST' }),
+  resetDemo: () => req('/api/demo/reset', { method: 'POST' }),
   doctors: () => req('/api/doctors'),
   addDoctor: (name) => req('/api/doctors', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
