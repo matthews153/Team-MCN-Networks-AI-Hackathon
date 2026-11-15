@@ -53,16 +53,19 @@ export default function CaseDetail({ id, onChange }) {
     setSaving(true)
     try {
       const labels = agrees ? ai : review.labels
+      const priorityScore = agrees ? Math.round(r.triage.score) : review.priorityScore
       const interpretationAgrees = JSON.stringify([...labels].sort()) === JSON.stringify([...ai].sort())
-      const priorityAgrees = review.priorityScore === Math.round(r.triage.score)
+      const priorityAgrees = priorityScore === Math.round(r.triage.score)
       const d = await api.review(c.id, {
         status: 'reviewed', doctor_labels: labels,
         agrees: interpretationAgrees && priorityAgrees,
-        priority: priorityForScore(review.priorityScore),
-        priority_score: review.priorityScore,
+        priority: priorityForScore(priorityScore),
+        priority_score: priorityScore,
         notes: review.notes,
       })
-      setC(d); onChange?.()
+      setC(d)
+      setReview((rv) => ({ ...rv, labels, priorityScore }))
+      onChange?.()
     } finally { setSaving(false) }
   }
   const del = async () => { if (confirm('Delete this case?')) { await api.del(c.id); onChange?.(); navigate('#/queue') } }
