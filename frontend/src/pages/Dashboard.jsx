@@ -15,9 +15,9 @@ export default function Dashboard({ cases, demo, health, onChange }) {
   const scoped = useMemo(() => cases.filter((c) => c.created_at >= Date.now() / 1000 - range * DAY), [cases, range])
 
   const stats = useMemo(() => {
-    const pending = scoped.filter((c) => c.review.status !== 'reviewed')
+    const pending = scoped.filter((c) => c.review.status === 'pending')
     const urgentPending = pending.filter((c) => c.triage.level === 'urgent')
-    const reviewed = scoped.filter((c) => c.review.status === 'reviewed' && c.review.agrees != null)
+    const reviewed = scoped.filter((c) => c.review.status !== 'pending' && c.review.agrees != null)
     const agree = reviewed.length ? reviewed.filter((c) => c.review.agrees).length / reviewed.length : null
     const tats = scoped.filter((c) => c.review.reviewed_at).map((c) => (c.review.reviewed_at - c.created_at) / 60).sort((a, b) => a - b)
     const medTat = tats.length ? tats[Math.floor(tats.length / 2)] : null

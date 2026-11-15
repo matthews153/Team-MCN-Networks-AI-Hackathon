@@ -10,14 +10,14 @@ import threading
 import time
 import uuid
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 import numpy as np
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ml.config import ARTIFACTS_DIR, CLASS_INFO, CLASSES, DATA_DIR, ROOT
 
@@ -111,11 +111,18 @@ if _backfill_voltage():
 
 def _summary(c: dict) -> dict:
     r = c["result"]
+    triage = dict(r["triage"])
+    review_score = (c.get("review") or {}).get("priority_score")
+    if review_score is not None:
+        triage["score"] = review_score
+        triage["level"] = "urgent" if review_score >= 75 else "priority" if review_score >= 40 else "routine"
+        triage["label"] = {"urgent": "Urgent review", "priority": "Priority review",
+                           "routine": "Routine"}[triage["level"]]
     return {
         "id": c["id"], "created_at": c["created_at"], "source": c["source"],
         "patient": c["patient"], "review": c["review"], "demo": c.get("demo", False),
         "category": r["category"], "headline": r["headline"], "flagged": r["flagged"],
-        "triage": {k: r["triage"][k] for k in ("level", "label", "score")},
+        "triage": {k: triage[k] for k in ("level", "label", "score")},
         "quality": {"score": r["quality"]["score"], "grade": r["quality"]["grade"]},
         "heart_rate": r["rhythm"].get("heart_rate"),
         "probs": {f["code"]: f["probability"] for f in r["findings"]},
@@ -133,7 +140,7 @@ def _new_case(result: dict, patient: dict, source: str, ground_truth=None, demo=
         "patient": patient, "result": result, "ground_truth": ground_truth, "demo": demo,
         "uploaded_by": uploaded_by,
         "review": {"status": "pending", "doctor_labels": None, "agrees": None,
-                   "notes": "", "reviewed_at": None},
+                   "notes": "", "priority_score": None, "reviewed_at": None},
     }
     with _lock:
         CASES[cid] = case
@@ -261,15 +268,31 @@ class Review(BaseModel):
     doctor_labels: Optional[list[str]] = None
     agrees: Optional[bool] = None
     notes: str = ""
+    priority: Optional[Literal["urgent", "priority", "routine"]] = None
+    priority_score: Optional[float] = Field(default=None, ge=0, le=100)
 
 
 @app.patch("/api/cases/{cid}/review")
 def review_case(cid: str, review: Review, request: Request):
     if cid not in CASES:
         raise HTTPException(404, "case not found")
+    case = CASES[cid]
+    ai_labels = set(case["result"]["flagged"])
+    if case["result"]["category"] == "normal":
+        ai_labels.add("NORM")
+    doctor_labels = set(review.doctor_labels or [])
+    interpretation_overridden = doctor_labels != ai_labels
+    ai_priority = case["result"]["triage"]["level"]
+    ai_score = round(case["result"]["triage"]["score"])
+    priority_overridden = (
+        review.priority_score is not None and review.priority_score != ai_score
+    ) or (
+        review.priority_score is None and review.priority is not None and review.priority != ai_priority
+    )
+    status = "overridden" if interpretation_overridden or priority_overridden else "reviewed"
     with _lock:
-        CASES[cid]["review"] = {**review.model_dump(), "reviewed_at": time.time(),
-                                "reviewed_by": _doctor(request)}
+        CASES[cid]["review"] = {**review.model_dump(), "status": status,
+                                "reviewed_at": time.time(), "reviewed_by": _doctor(request)}
         _save()
     return CASES[cid]
 
@@ -500,7 +523,8 @@ def seed_demo(n: int = 24):
             agrees = primary in meta["true_labels"]
             case["review"] = {"status": "reviewed",
                               "doctor_labels": meta["true_labels"], "agrees": agrees,
-                              "notes": "", "reviewed_at": case["created_at"] + rng.uniform(600, 20000)}
+                              "notes": "", "priority_score": None,
+                              "reviewed_at": case["created_at"] + rng.uniform(600, 20000)}
     with _lock:
         _save()
     return {"ok": True, "count": len(picks)}

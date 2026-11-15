@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import ECGViewer, { LeadDetail } from '../components/ECGViewer'
 import VoltageCheck from '../components/VoltageCheck'
-import { api, CLASSES, CLASS_COLORS, CLASS_NAMES, CLASS_SHORT, fmtDate, navigate, pct } from '../lib'
+import { api, CLASSES, CLASS_COLORS, CLASS_NAMES, CLASS_SHORT, TRIAGE, fmtDate, navigate, pct } from '../lib'
 import { Card, ChartTip, ClassTag, ErrorState, TriageBadge } from '../components/ui'
 
 const LEADS = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
@@ -19,7 +19,7 @@ export default function CaseDetail({ id, onChange }) {
   const [layout, setLayout] = useState('clinical')
   const [showSal, setShowSal] = useState(true)
   const [lead, setLead] = useState('II')
-  const [review, setReview] = useState({ labels: [], notes: '' })
+  const [review, setReview] = useState({ labels: [], notes: '', priorityScore: 0 })
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -27,7 +27,11 @@ export default function CaseDetail({ id, onChange }) {
     api.case(id).then((d) => {
       setC(d)
       const r = d.result
-      setReview({ labels: d.review.doctor_labels || (r.flagged.length ? r.flagged : r.category === 'normal' ? ['NORM'] : []), notes: d.review.notes || '' })
+      setReview({
+        labels: d.review.doctor_labels || (r.flagged.length ? r.flagged : r.category === 'normal' ? ['NORM'] : []),
+        notes: d.review.notes || '',
+        priorityScore: Math.round(d.review.priority_score ?? r.triage.score),
+      })
       const top = r.findings.find((f) => f.code === r.focus_class)?.top_leads?.[0]
       if (top) setLead(top)
     }).catch((e) => setErr(e.message))
@@ -40,12 +44,24 @@ export default function CaseDetail({ id, onChange }) {
   const focus = r.findings.find((f) => f.code === r.focus_class)
   const radar = r.findings.map((f) => ({ name: CLASS_SHORT[f.code], probability: Math.round(f.probability * 100), threshold: Math.round(f.threshold * 100) }))
   const gt = c.ground_truth
+  const priorityForScore = (score) => score >= 75 ? 'urgent' : score >= 40 ? 'priority' : 'routine'
+  const selectedPriority = priorityForScore(review.priorityScore)
+  const overallTriage = { ...r.triage, level: selectedPriority, score: review.priorityScore,
+    label: TRIAGE[selectedPriority].label }
 
   const save = async (agrees) => {
     setSaving(true)
     try {
       const labels = agrees ? ai : review.labels
-      const d = await api.review(c.id, { status: 'reviewed', doctor_labels: labels, agrees: agrees ?? (JSON.stringify([...labels].sort()) === JSON.stringify([...ai].sort())), notes: review.notes })
+      const interpretationAgrees = JSON.stringify([...labels].sort()) === JSON.stringify([...ai].sort())
+      const priorityAgrees = review.priorityScore === Math.round(r.triage.score)
+      const d = await api.review(c.id, {
+        status: 'reviewed', doctor_labels: labels,
+        agrees: interpretationAgrees && priorityAgrees,
+        priority: priorityForScore(review.priorityScore),
+        priority_score: review.priorityScore,
+        notes: review.notes,
+      })
       setC(d); onChange?.()
     } finally { setSaving(false) }
   }
@@ -56,7 +72,7 @@ export default function CaseDetail({ id, onChange }) {
       <div className="page-head">
         <div>
           <button className="btn sm ghost no-print" onClick={() => history.back()} style={{ marginBottom: 8 }}><ArrowLeft size={14} /> Back</button>
-          <h2 className="row">Case {c.patient?.patient_id || c.id}{c.demo && <span className="demo-tag" title="Demo case built from a PTB-XL test ECG">Demo</span>} <TriageBadge level={r.triage.level} score={r.triage.score} large /></h2>
+          <h2 className="row">Case {c.patient?.patient_id || c.id}{c.demo && <span className="demo-tag" title="Demo case built from a PTB-XL test ECG">Demo</span>} <TriageBadge level={overallTriage.level} score={overallTriage.score} large /></h2>
           <p>
             {c.patient?.age ? `${Math.round(c.patient.age)} y` : 'Age —'} · {c.patient?.sex === 'F' ? 'Female' : c.patient?.sex === 'M' ? 'Male' : 'Sex —'}
             {c.patient?.facility ? ` · ${c.patient.facility}` : ''} · {c.source} · received {fmtDate(c.created_at)}{c.uploaded_by ? ` · uploaded by ${c.uploaded_by}` : ''}
@@ -216,7 +232,54 @@ export default function CaseDetail({ id, onChange }) {
         </Card>
 
         <Card title="Clinician review" icon={<ClipboardCheck size={16} color="var(--accent)" />}
-          right={c.review.status === 'reviewed' ? <span className="badge routine"><CheckCircle2 size={13} /> Reviewed{c.review.reviewed_by ? ` by ${c.review.reviewed_by}` : ''} {fmtDate(c.review.reviewed_at)}</span> : <span className="badge neutral">Pending</span>}>
+          right={c.review.status === 'overridden'
+            ? <span className="badge priority"><XCircle size={13} /> Overridden{c.review.reviewed_by ? ` by ${c.review.reviewed_by}` : ''} {fmtDate(c.review.reviewed_at)}</span>
+            : c.review.status === 'reviewed'
+              ? <span className="badge routine"><CheckCircle2 size={13} /> Reviewed{c.review.reviewed_by ? ` by ${c.review.reviewed_by}` : ''} {fmtDate(c.review.reviewed_at)}</span>
+              : <span className="badge neutral">Pending</span>}>
+          <div className="small muted" style={{ marginBottom: 6 }}>Your review priority</div>
+          <div className="row between small">
+            <strong>{TRIAGE[selectedPriority].label} · {Math.round(review.priorityScore)}/100</strong>
+            <button type="button" className="btn sm ghost" onClick={() => setReview((rv) => ({ ...rv, priorityScore: Math.round(r.triage.score) }))}
+              disabled={review.priorityScore === Math.round(r.triage.score)}>Set to AI priority</button>
+          </div>
+          <label className="row small" style={{ gap: 8, marginTop: 10 }}>
+            <span className="muted">Priority score</span>
+            <input
+              className="input"
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              inputMode="numeric"
+              value={review.priorityScore}
+              aria-label="Priority score from 0 to 100"
+              onKeyDown={(e) => { if (['e', 'E', '+', '-', '.', ','].includes(e.key)) e.preventDefault() }}
+              onChange={(e) => {
+                const raw = e.target.value
+                if (/^\d*$/.test(raw) && raw !== '') {
+                  const value = Number(raw)
+                  setReview((rv) => ({ ...rv, priorityScore: Math.min(100, value) }))
+                }
+              }}
+              style={{ width: 90 }}
+            />
+            <span className="muted">/100</span>
+          </label>
+          <input
+            className="settings-range"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            value={review.priorityScore}
+            style={{ '--range-progress': `${review.priorityScore}%` }}
+            aria-label="Review priority"
+            onChange={(e) => setReview((rv) => ({ ...rv, priorityScore: Number(e.target.value) }))}
+          />
+          <div className="row between muted small" style={{ marginBottom: 14 }}>
+            <span>0 Routine</span><span>40 Priority</span><span>75 Urgent</span><span>100</span>
+          </div>
           <div className="small muted" style={{ marginBottom: 6 }}>Your interpretation (select all that apply)</div>
           <div className="row wrap" style={{ gap: 6, marginBottom: 12 }}>
             {CLASSES.map((cl) => {
@@ -234,9 +297,9 @@ export default function CaseDetail({ id, onChange }) {
             <button className="btn primary" disabled={saving} onClick={() => save(true)}><CheckCircle2 size={15} /> Agree with AI</button>
             <button className="btn" disabled={saving} onClick={() => save(null)}><XCircle size={15} /> Save my interpretation</button>
           </div>
-          {c.review.status === 'reviewed' && (
+          {c.review.status !== 'pending' && (
             <div className="small text-2" style={{ marginTop: 12 }}>
-              Recorded{c.review.reviewed_by ? ` by ${c.review.reviewed_by}` : ''}: {c.review.agrees ? 'agrees with AI' : 'differs from AI'} · {(c.review.doctor_labels || []).map((x) => CLASS_SHORT[x]).join(', ') || 'no labels'}
+              Recorded{c.review.reviewed_by ? ` by ${c.review.reviewed_by}` : ''}: {c.review.agrees ? 'agrees with AI' : 'differs from AI'} · priority: {c.review.priority_score != null ? `${TRIAGE[c.review.priority].label} (${Math.round(c.review.priority_score)}/100)` : `AI (${TRIAGE[r.triage.level].label})`} · {(c.review.doctor_labels || []).map((x) => CLASS_SHORT[x]).join(', ') || 'no labels'}
             </div>
           )}
         </Card>

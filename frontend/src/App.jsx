@@ -147,7 +147,7 @@ export default function App() {
   const demoCount = cases.filter((c) => c.demo).length
   const visibleCases = showDemo ? cases : cases.filter((c) => !c.demo)
   const demo = { show: showDemo, setShow: setShowDemo, count: demoCount, realCount: cases.length - demoCount }
-  const urgentPending = visibleCases.filter((c) => c.triage.level === 'urgent' && c.review.status !== 'reviewed').length
+  const urgentPending = visibleCases.filter((c) => c.triage.level === 'urgent' && c.review.status === 'pending').length
   const caseMatch = hash.match(/^#\/case\/(\w+)/)
   const activeNav = NAV.find((n) => n.hash === '#/' ? hash === '#/' || hash === '' : hash.startsWith(n.hash))
   const mobileTitle = caseMatch ? 'Case review' : activeNav?.label || 'Dashboard'

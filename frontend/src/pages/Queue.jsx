@@ -13,16 +13,16 @@ export default function Queue({ cases, demo, doctor, onChange }) {
   const [resetting, setResetting] = useState(false)
 
   // Reading order among the cases currently shown (demo toggle respected): most urgent first,
-  // ties broken by who has waited longest. The 0–100 score itself is per patient and never changes.
+  // ties broken by who has waited longest.
   const queuePos = useMemo(() => {
-    const pending = cases.filter((c) => c.review.status !== 'reviewed').sort(byPriority)
+    const pending = cases.filter((c) => c.review.status === 'pending').sort(byPriority)
     return { rank: new Map(pending.map((c, i) => [c.id, i + 1])), total: pending.length }
   }, [cases])
 
   const rows = useMemo(() => {
     let r = cases.filter((c) =>
       (level === 'all' || c.triage.level === level) &&
-      (status === 'all' || (status === 'pending' ? c.review.status !== 'reviewed' : c.review.status === 'reviewed')) &&
+      (status === 'all' || (status === 'pending' ? c.review.status === 'pending' : c.review.status !== 'pending')) &&
       (who === 'all' || c.uploaded_by === doctor || c.review.reviewed_by === doctor) &&
       (finding === 'all' || (finding === 'NORM' ? c.category === 'normal' : c.flagged.includes(finding))) &&
       (!q || JSON.stringify([c.patient, c.source]).toLowerCase().includes(q.toLowerCase())))
@@ -62,7 +62,7 @@ export default function Queue({ cases, demo, doctor, onChange }) {
       <div className="page-head">
         <div>
           <h2>Review queue</h2>
-          <p>Cases ranked by AI review priority. Urgent cases float to the top so nothing time-critical gets buried.</p>
+          <p>Cases ranked by current review priority. Urgent cases float to the top so nothing time-critical gets buried.</p>
         </div>
         <div className="row">
           <button className="btn" onClick={exportCsv}><Download size={15} /> Export CSV</button>
@@ -134,8 +134,8 @@ export default function Queue({ cases, demo, doctor, onChange }) {
                   <td className="small text-2" style={{ maxWidth: 170 }}>{c.patient?.symptoms?.length ? c.patient.symptoms.join(', ') : '—'}</td>
                   <td className="num">{c.heart_rate ? Math.round(c.heart_rate) : '—'}</td>
                   <td className="num" style={{ color: c.quality.grade === 'poor' ? 'var(--critical)' : undefined }}>{Math.round(c.quality.score)}</td>
-                  <td>{c.review.status === 'reviewed'
-                    ? <span className={`badge ${c.review.agrees ? 'routine' : 'priority'}`}>{c.review.agrees ? 'Agreed' : 'Overridden'}</span>
+                  <td>{c.review.status !== 'pending'
+                    ? <span className={`badge ${c.review.status === 'overridden' ? 'priority' : 'routine'}`}>{c.review.status === 'overridden' ? 'Overridden' : 'Agreed'}</span>
                     : <span className="badge neutral">Pending</span>}
                     {c.review.reviewed_by && <div className="muted small signed-by">by {c.review.reviewed_by}</div>}</td>
                   <td className="muted small">{fmtDate(c.created_at)}</td>
