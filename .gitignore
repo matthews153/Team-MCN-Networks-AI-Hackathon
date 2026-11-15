@@ -5,3 +5,27 @@ __pycache__/
 data/
 frontend/node_modules/
 frontend/dist/
+
+# Demo video: the whole video/ folder (recorder, script, cards, narration, music, renders)
+# and any video/audio file anywhere stay local — never committed or pushed to GitHub.
+video/
+*.mp4
+*.mov
+*.m4v
+*.webm
+*.mkv
+*.avi
+*.wav
+*.mp3
+*.m4a
+*.aac
+*.aiff
+*.flac
+*.ogg
+
+# secrets (API keys) — never commit
+.env
+.env.*
+
+# Office lock files
+~$*

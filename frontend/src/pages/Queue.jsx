@@ -41,10 +41,10 @@ export default function Queue({ cases, demo, doctor, onChange }) {
   }
   const clearAll = async () => {
     const real = demo?.realCount ?? 0
-    const msg = real
-      ? `Delete ALL cases, including ${real} real patient case${real === 1 ? '' : 's'}? This cannot be undone.`
-      : 'Delete ALL cases? This cannot be undone.'
-    if (confirm(msg)) { await api.clear(); onChange?.() }
+    if (!real) { alert('There are no real patient cases to clear. Demo cases are not affected by Clear all.'); return }
+    if (confirm(`Delete all ${real} real patient case${real === 1 ? '' : 's'}? This cannot be undone.\n\nDemo cases are kept.`)) {
+      await api.clear(); onChange?.()
+    }
   }
   const resetDemo = async () => {
     if (!confirm('Reset demo cases to the original setup?\n\nAll demo cases (and any reviews or edits made on them) are replaced with the standard 24 demo patients. Real patient cases are kept.')) return
@@ -71,7 +71,7 @@ export default function Queue({ cases, demo, doctor, onChange }) {
             {resetting ? <span className="spinner" /> : <RotateCcw size={15} />} Reset demo cases
           </button>
           {demo?.count > 0 && <button className="btn" onClick={clearDemo}><FlaskConical size={15} /> Remove demo cases</button>}
-          <button className="btn danger ghost" onClick={clearAll}><Trash2 size={15} /> Clear all</button>
+          <button className="btn danger ghost" onClick={clearAll} title="Delete all real patient cases. Demo cases are kept."><Trash2 size={15} /> Clear all</button>
         </div>
       </div>
 

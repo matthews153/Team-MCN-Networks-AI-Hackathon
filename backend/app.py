@@ -9,6 +9,7 @@ import random
 import threading
 import time
 import uuid
+import os
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -28,6 +29,9 @@ app = FastAPI(title="CardioLens API", version="1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 engine = Engine()
+# Where cases, doctors and snapshots are stored. CARDIOLENS_DATA_DIR lets a second instance
+# (e.g. for recording a demo) run with its own, separate data.
+DATA_DIR = Path(os.environ.get("CARDIOLENS_DATA_DIR", DATA_DIR))
 CASES_FILE = DATA_DIR / "cases.json"
 _lock = threading.Lock()
 CASES: dict[str, dict] = {}
@@ -101,7 +105,7 @@ def _doctor(request: Request) -> Optional[str]:
 
 
 def _save():
-    DATA_DIR.mkdir(exist_ok=True)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     CASES_FILE.write_text(json.dumps(list(CASES.values())))
 
 
@@ -167,7 +171,7 @@ def _load_samples():
 # --------------------------------------------------------------------------- #
 # Bump when the API gains or changes endpoints; the dashboard checks it (frontend/src/lib.js)
 # so an old server process left running after a `git pull` is reported clearly.
-API_VERSION = 5
+API_VERSION = 6
 
 
 @app.get("/api/health")
@@ -307,9 +311,10 @@ def delete_case(cid: str):
 
 @app.delete("/api/cases")
 def clear_cases(demo_only: bool = False):
-    """Delete all cases, or with ?demo_only=true only the demo/synthetic ones."""
+    """Delete the real (non-demo) patient cases; demo cases are always kept.
+    With ?demo_only=true it does the opposite: delete only the demo/synthetic cases."""
     with _lock:
-        ids = [k for k, c in CASES.items() if c.get("demo")] if demo_only else list(CASES)
+        ids = [k for k, c in CASES.items() if bool(c.get("demo")) == demo_only]
         for k in ids:
             CASES.pop(k, None)
         _save()
@@ -348,7 +353,7 @@ def add_doctor(d: DoctorIn):
 
 
 def _save_doctors(names: list[str]) -> None:
-    DATA_DIR.mkdir(exist_ok=True)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     DOCTORS_FILE.write_text(json.dumps(names))
 
 
