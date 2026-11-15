@@ -150,6 +150,7 @@ export default function App() {
     <div className="app">
       <aside className={`sidebar ${navOpen ? 'nav-open' : ''}`}>
         <div className="brand">
+          <span className="brand-mark" aria-hidden="true"><img src="/logo.svg" alt="" /></span>
           <h1>CardioLens</h1>
         </div>
         <nav id="primary-navigation" className={`nav-list ${navOpen ? 'open' : ''}`} aria-label="Primary navigation">

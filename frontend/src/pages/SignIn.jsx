@@ -38,9 +38,7 @@ export default function SignIn({ onSignIn, outdated }) {
     <div className="signin">
       <div className="signin-card">
         <div className="brand signin-brand">
-          {/* Logo slot (64 x 64 px): put the CardioLens logo here, e.g. <img src="/logo.svg" alt="" />.
-              While it is empty it takes no space. */}
-          <div className="signin-logo" aria-hidden="true" />
+          <img className="signin-logo" src="/logo.svg" alt="" aria-hidden="true" />
           <div><h1>CardioLens</h1><small>ECG triage workstation</small></div>
         </div>
         {outdated && <OutdatedServer />}
