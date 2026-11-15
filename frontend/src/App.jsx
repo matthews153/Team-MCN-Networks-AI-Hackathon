@@ -74,7 +74,7 @@ export default function App() {
   const signIn = (name) => { setDoctor(name); setDoctorState(name) }
   const signOut = () => { setDoctor(''); setDoctorState('') }
   // Demo / synthetic cases can be hidden so only real patients are shown (remembered per browser)
-  const [showDemo, setShowDemoState] = useState(() => localStorage.getItem('cardiolens.showDemo') !== 'false')
+  const [showDemo, setShowDemoState] = useState(() => localStorage.getItem('cardiolens.showDemo') === 'true')
   const setShowDemo = useCallback((v) => { localStorage.setItem('cardiolens.showDemo', String(v)); setShowDemoState(v) }, [])
   const [displaySettings, setDisplaySettings] = useState(loadDisplaySettings)
   const updateDisplaySetting = (key, value) => {
