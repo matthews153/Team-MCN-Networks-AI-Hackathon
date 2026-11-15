@@ -21,6 +21,11 @@ const NAV = [
 ]
 const THEMES = ['clinical', 'bright', 'midnight', 'sage']
 
+function preferenceKey(doctor, key) {
+  const identity = encodeURIComponent((doctor || 'anonymous').trim().toLowerCase())
+  return `cardiolens.user.${identity}.${key}`
+}
+
 function storedRange(key, fallback, max = 100) {
   const saved = localStorage.getItem(key)
   if (saved === 'comfortable') return 0
@@ -30,9 +35,9 @@ function storedRange(key, fallback, max = 100) {
   return Number.isFinite(value) ? Math.max(0, Math.min(max, value)) : fallback
 }
 
-function storedDensity() {
-  const saved = localStorage.getItem('cardiolens.density')
-  const currentScale = localStorage.getItem('cardiolens.density.version') === '2'
+function storedDensity(key, versionKey) {
+  const saved = localStorage.getItem(key)
+  const currentScale = localStorage.getItem(versionKey) === '2'
   if (saved === 'comfortable') return 100
   if (saved === 'compact') return 0
   if (saved === null || saved === '') return 100
@@ -43,15 +48,19 @@ function storedDensity() {
     : Math.max(0, Math.min(100, 100 - value))
 }
 
-function loadDisplaySettings() {
-  const savedTheme = localStorage.getItem('cardiolens.theme')
-  const oldBrightness = localStorage.getItem('cardiolens.brightness')
+function loadDisplaySettings(doctor) {
+  const savedTheme = localStorage.getItem(preferenceKey(doctor, 'theme'))
+  const oldBrightness = localStorage.getItem(preferenceKey(doctor, 'brightness'))
   const legacyTheme = { bright: 'bright', dark: 'midnight', soft: 'sage', balanced: 'clinical', normal: 'clinical' }
   return {
-    brightness: storedRange('cardiolens.brightness', 50),
+    brightness: storedRange(preferenceKey(doctor, 'brightness'), 50),
     theme: THEMES.includes(savedTheme) ? savedTheme : legacyTheme[oldBrightness] || 'clinical',
-    density: storedDensity(),
+    density: storedDensity(preferenceKey(doctor, 'density'), preferenceKey(doctor, 'density.version')),
   }
+}
+
+function loadShowDemo(doctor) {
+  return localStorage.getItem(preferenceKey(doctor, 'showDemo')) === 'true'
 }
 
 function useHash() {
@@ -71,15 +80,23 @@ export default function App() {
   const [error, setError] = useState(null)
   const [navOpen, setNavOpen] = useState(false)
   const [doctor, setDoctorState] = useState(getDoctor)
-  const signIn = (name) => { setDoctor(name); setDoctorState(name) }
+  const signIn = (name) => {
+    setDoctor(name)
+    setDoctorState(name)
+    setShowDemoState(loadShowDemo(name))
+    setDisplaySettings(loadDisplaySettings(name))
+  }
   const signOut = () => { setDoctor(''); setDoctorState('') }
   // Demo / synthetic cases can be hidden so only real patients are shown (remembered per browser)
-  const [showDemo, setShowDemoState] = useState(() => localStorage.getItem('cardiolens.showDemo') === 'true')
-  const setShowDemo = useCallback((v) => { localStorage.setItem('cardiolens.showDemo', String(v)); setShowDemoState(v) }, [])
-  const [displaySettings, setDisplaySettings] = useState(loadDisplaySettings)
+  const [showDemo, setShowDemoState] = useState(() => loadShowDemo(getDoctor()))
+  const setShowDemo = useCallback((v) => {
+    localStorage.setItem(preferenceKey(doctor, 'showDemo'), String(v))
+    setShowDemoState(v)
+  }, [doctor])
+  const [displaySettings, setDisplaySettings] = useState(() => loadDisplaySettings(getDoctor()))
   const updateDisplaySetting = (key, value) => {
-    localStorage.setItem(`cardiolens.${key}`, value)
-    if (key === 'density') localStorage.setItem('cardiolens.density.version', '2')
+    localStorage.setItem(preferenceKey(doctor, key), value)
+    if (key === 'density') localStorage.setItem(preferenceKey(doctor, 'density.version'), '2')
     setDisplaySettings((current) => ({ ...current, [key]: value }))
   }
   useEffect(() => {

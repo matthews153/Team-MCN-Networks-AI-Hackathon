@@ -24,7 +24,7 @@ export default function Settings({ display, onChange }) {
       <Card
         className="settings-card"
         title="Display preferences"
-        sub="These choices are saved in this browser."
+        sub="These choices are saved for your signed-in account in this browser."
         icon={<SlidersHorizontal size={16} aria-hidden="true" />}
       >
         <div className="settings-content">
