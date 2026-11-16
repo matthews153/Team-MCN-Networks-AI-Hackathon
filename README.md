@@ -47,8 +47,8 @@ cd Team-MCN-Networks-AI-Hackathon
 
 ```bash
 python3 -m venv .venv
-.venv/bin/python -m pip install --upgrade pip
-.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python3 -m pip install --upgrade pip
+.venv/bin/python3 -m pip install -r requirements.txt
 ```
 
 **Windows (Command Prompt or PowerShell):**
@@ -59,14 +59,14 @@ py -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt
 ```
 
-This creates a private Python environment in the `.venv` folder, so nothing is installed system-wide.
+This creates a private Python environment (a "virtual environment") in the `.venv` folder, so nothing is installed system-wide. You don't need to "activate" it: every command in this README calls the Python inside `.venv` directly. Run all commands from inside the project folder.
 
 ### 4. Start the app
 
 **macOS / Linux:**
 
 ```bash
-.venv/bin/python Main.py
+.venv/bin/python3 Main.py
 ```
 
 **Windows:**
@@ -168,24 +168,24 @@ ECGs of any length and sampling rate are resampled to the 10 s × 100 Hz the mod
 
 | Command | What it does |
 |---|---|
-| `.venv/bin/python Main.py` | one server, API + dashboard on port 8000 |
-| `.venv/bin/python Main.py --port 9000` | use a different port |
-| `.venv/bin/python Main.py --no-browser` | don't open a browser |
-| `.venv/bin/python Main.py --rebuild` | force a fresh dashboard build |
-| `.venv/bin/python Main.py --dev` | UI development: Vite hot reload on :5173, API auto-reload on :8000 |
+| `.venv/bin/python3 Main.py` | one server, API + dashboard on port 8000 |
+| `.venv/bin/python3 Main.py --port 9000` | use a different port |
+| `.venv/bin/python3 Main.py --no-browser` | don't open a browser |
+| `.venv/bin/python3 Main.py --rebuild` | force a fresh dashboard build |
+| `.venv/bin/python3 Main.py --dev` | UI development: Vite hot reload on :5173, API auto-reload on :8000 |
 
-On Windows, use `.venv\Scripts\python` in place of `.venv/bin/python`.
+On Windows, use `.venv\Scripts\python` in place of `.venv/bin/python3` (a Windows virtual environment only has `python`, not `python3`).
 
 **Demo data:** **Remove demo cases** in the review queue deletes only the demo cases. **Reset demo cases** brings back the original 24. **Clear all** deletes only the real (uploaded) cases; demo cases are always kept.
 
 **Snapshots (save and bring back case lists):** cases live in `data/cases.json`. Named copies are kept in `data/snapshots/`, which is local only and not committed.
 
 ```bash
-.venv/bin/python cases.py list                          # saved snapshots and what's on the dashboard now
-.venv/bin/python cases.py save before_demo              # save the current cases
-.venv/bin/python cases.py restore before_demo           # bring them back (merges; existing cases are kept)
-.venv/bin/python cases.py restore before_demo --demo-only   # only the demo cases
-.venv/bin/python cases.py restore before_demo --replace     # replace the current cases entirely
+.venv/bin/python3 cases.py list                          # saved snapshots and what's on the dashboard now
+.venv/bin/python3 cases.py save before_demo              # save the current cases
+.venv/bin/python3 cases.py restore before_demo           # bring them back (merges; existing cases are kept)
+.venv/bin/python3 cases.py restore before_demo --demo-only   # only the demo cases
+.venv/bin/python3 cases.py restore before_demo --replace     # replace the current cases entirely
 ```
 
 These commands work whether or not CardioLens is running. If it is, the dashboard updates straight away.
@@ -194,7 +194,7 @@ These commands work whether or not CardioLens is running. If it is, the dashboar
 * **`python3: command not found` (macOS/Linux) or `py` not recognised (Windows):** install Python from https://www.python.org/downloads/. On Windows, tick **"Add Python to PATH"** during installation, then open a new terminal.
 * **`npm was not found. Install Node.js 18+`:** install Node.js (LTS) from https://nodejs.org/, open a **new** terminal, and run the start command again.
 * **`No module named ...` when starting:** the packages aren't installed in `.venv`. Run step 3 again, from inside the project folder.
-* **"Port 8000 is used by another program":** start on another port, e.g. `.venv/bin/python Main.py --port 8001`, and open http://127.0.0.1:8001.
+* **"Port 8000 is used by another program":** start on another port, e.g. `.venv/bin/python3 Main.py --port 8001`, and open http://127.0.0.1:8001.
 * **"The CardioLens server is out of date" or "Method Not Allowed" after a `git pull`:** an old server process is still running. Stop it with Ctrl+C in its terminal (or close that terminal, or on macOS/Linux run `lsof -ti tcp:8000 | xargs kill`), then start it again.
 * **An upload says the file couldn't be read:** for WFDB, make sure you selected both the `.hea` and the `.dat` file. For CSV, check that there are 12 columns. The error message says what's wrong.
 * For developers: when you add or change API endpoints, bump `API_VERSION` in `backend/app.py` and `REQUIRED_API` in `frontend/src/lib.js`.
@@ -207,8 +207,8 @@ mkdir -p data && cd data
 curl -L -o ptbxl.zip https://physionet.org/static/published-projects/ptb-xl/ptb-xl-a-large-publicly-accessible-electrocardiography-dataset-1.0.3.zip
 unzip ptbxl.zip && rm ptbxl.zip && cd ..
 
-.venv/bin/python -m ml.train --models 3 --epochs 20   # ~1 h on an Apple M2 (MPS)
-.venv/bin/python -m ml.make_sample_uploads            # optional: regenerate sample_uploads/
+.venv/bin/python3 -m ml.train --models 3 --epochs 20   # ~1 h on an Apple M2 (MPS)
+.venv/bin/python3 -m ml.make_sample_uploads            # optional: regenerate sample_uploads/
 ```
 
 ---
@@ -269,9 +269,9 @@ unzip ptbxl.zip && rm ptbxl.zip && cd ..
    Per class, sensitivity / PPV: MI 79% / 73%, STTC 81% / 77%, CD 76% / 80%, HYP 73% / 55%. Hypertrophy uses a lowered threshold (0.20) on purpose: it catches more cases at the cost of more false alarms.
    Fairness: macro AUROC is 0.943 for men and 0.923 for women. The weakest group is under-40s: only 50% of their abnormal ECGs are kept out of the "Normal" class, and MI sensitivity falls to 57%. Young patients with disease are the most likely to be missed.
 
-   Hypertrophy safety net: every ECG is also checked against the classic LVH voltage criteria (Sokolow-Lyon, sex-specific Cornell; `ml/voltage.py`). On the test set the voltage rules alone catch 51% of hypertrophy with 42% PPV, which is worse than the AI's 73% / 55%. Used as a safety net next to the AI, they raise hypertrophy detection to 77%, at the cost of 113 extra flags: only about 1 in 13 voltage flags the AI didn't make is real hypertrophy. The case page shows the measured values and this hit rate. Reproduce with `python -m ml.eval_voltage`.
+   Hypertrophy safety net: every ECG is also checked against the classic LVH voltage criteria (Sokolow-Lyon, sex-specific Cornell; `ml/voltage.py`). On the test set the voltage rules alone catch 51% of hypertrophy with 42% PPV, which is worse than the AI's 73% / 55%. Used as a safety net next to the AI, they raise hypertrophy detection to 77%, at the cost of 113 extra flags: only about 1 in 13 voltage flags the AI didn't make is real hypertrophy. The case page shows the measured values and this hit rate. Reproduce with `.venv/bin/python3 -m ml.eval_voltage`.
 
-   After changing a decision threshold in `artifacts/metrics.json`, run `python -m ml.recompute_metrics` (or `python -m ml.recompute_metrics --set HYP=0.2`) to refresh every threshold-dependent number without retraining.
+   After changing a decision threshold in `artifacts/metrics.json`, run `.venv/bin/python3 -m ml.recompute_metrics` (or `.venv/bin/python3 -m ml.recompute_metrics --set HYP=0.2`) to refresh every threshold-dependent number without retraining.
 4. **Where does it fail?** See the *Hardest test cases* table and the failure chart. Typical failures: subtle or old MI read as normal; multi-label ECGs where only one finding is caught; hypertrophy (rarest class, lowest PPV); the youngest age group, which has few abnormal training examples.
 
 **Make it our own:** a specific clinical user and workflow (remote ECG triage queue), uncertainty from ensemble disagreement, signal-quality gating, explainability overlays, and a subgroup fairness audit.
@@ -279,7 +279,7 @@ unzip ptbxl.zip && rm ptbxl.zip && cd ..
 ### Limitations
 * PTB-XL labels describe ECG findings, not urgency or outcomes, so the priority rule is a transparent heuristic, not a validated risk model.
 * Voltage criteria are a rule of thumb: they miss many cases of hypertrophy, and healthy young, thin or athletic people can meet them.
-* PTB-XL's free-text reports are mostly German (some Swedish). CardioLens shows them in English, built from the cardiologists' coded SCP-ECG statements (`ml/data.py: english_report`), not machine-translated; the original wording is available on click. To add this to existing artifacts, run `python -m ml.english_reports`.
+* PTB-XL's free-text reports are mostly German (some Swedish). CardioLens shows them in English, built from the cardiologists' coded SCP-ECG statements (`ml/data.py: english_report`), not machine-translated; the original wording is available on click. To add this to existing artifacts, run `.venv/bin/python3 -m ml.english_reports`.
 * Data comes from a single German source (1989–1996), so generalisation to other devices and populations is untested.
 * Photos and scans of paper ECGs are not supported yet; only digital waveforms are.
 
