@@ -20,7 +20,7 @@ export const SYMPTOMS = ['chest pain', 'shortness of breath', 'palpitations', 'd
 // process still running after a `git pull` is detected and reported instead of failing oddly.
 export const REQUIRED_API = 6
 // Default interface spacing (Settings → Interface spacing); shown as "Standard"
-export const STANDARD_DENSITY = 145
+export const STANDARD_DENSITY = 100
 export const serverOutdated = (health) => !!health && (health.api_version ?? 0) < REQUIRED_API
 
 // Name-only sign-in: the chosen doctor is remembered per browser and sent with every request

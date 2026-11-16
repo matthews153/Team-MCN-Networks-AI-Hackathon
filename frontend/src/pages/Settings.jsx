@@ -89,7 +89,7 @@ export default function Settings({ display, onChange }) {
           <section className="settings-row" aria-labelledby="density-heading">
             <div className="settings-copy">
               <h4 id="density-heading">Interface spacing</h4>
-              <p>Adjust spacing across panels, tables and navigation. Standard is 145%.</p>
+              <p>Adjust spacing across panels, tables and navigation, up to twice the standard amount.</p>
             </div>
             <div className="range-setting">
               <div className="range-readout"><span>{densityLabel}</span><output htmlFor="density-range">{display.density}%</output></div>

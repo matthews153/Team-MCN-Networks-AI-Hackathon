@@ -35,10 +35,10 @@ function storedRange(key, fallback, max = 100) {
   return Number.isFinite(value) ? Math.max(0, Math.min(max, value)) : fallback
 }
 
-// Interface spacing: 145% is the standard. Settings saved before this standard (older
+// Interface spacing: 100% is the standard. Settings saved before this version (older
 // density.version) are reset once to it; after that the doctor's own choice is kept.
 function storedDensity(key, versionKey) {
-  if (localStorage.getItem(versionKey) !== '3') return STANDARD_DENSITY
+  if (localStorage.getItem(versionKey) !== '4') return STANDARD_DENSITY
   const value = Number(localStorage.getItem(key))
   return Number.isFinite(value) && localStorage.getItem(key) !== '' ? Math.max(0, Math.min(200, value)) : STANDARD_DENSITY
 }
@@ -91,7 +91,7 @@ export default function App() {
   const [displaySettings, setDisplaySettings] = useState(() => loadDisplaySettings(getDoctor()))
   const updateDisplaySetting = (key, value) => {
     localStorage.setItem(preferenceKey(doctor, key), value)
-    if (key === 'density') localStorage.setItem(preferenceKey(doctor, 'density.version'), '3')
+    if (key === 'density') localStorage.setItem(preferenceKey(doctor, 'density.version'), '4')
     setDisplaySettings((current) => ({ ...current, [key]: value }))
   }
   useEffect(() => {
