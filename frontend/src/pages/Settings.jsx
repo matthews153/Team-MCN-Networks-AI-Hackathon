@@ -1,5 +1,6 @@
 import { SlidersHorizontal, Sun } from 'lucide-react'
 import { Card } from '../components/ui'
+import { STANDARD_DENSITY } from '../lib'
 
 const THEMES = [
   { value: 'clinical', name: 'Default', description: 'Balanced hospital workspace' },
@@ -10,7 +11,7 @@ const THEMES = [
 
 export default function Settings({ display, onChange }) {
   const brightnessLabel = display.brightness < 35 ? 'Dim' : display.brightness > 65 ? 'Bright' : 'Normal'
-  const densityLabel = display.density < 50 ? 'Compact' : display.density === 100 ? 'Standard' : display.density < 100 ? 'Balanced' : 'Spacious'
+  const densityLabel = display.density < 50 ? 'Compact' : display.density === STANDARD_DENSITY ? 'Standard' : display.density < STANDARD_DENSITY ? 'Balanced' : 'Spacious'
 
   return (
     <div className="settings-page">
@@ -88,7 +89,7 @@ export default function Settings({ display, onChange }) {
           <section className="settings-row" aria-labelledby="density-heading">
             <div className="settings-copy">
               <h4 id="density-heading">Interface spacing</h4>
-              <p>Adjust spacing across panels, tables and navigation, up to twice the standard amount.</p>
+              <p>Adjust spacing across panels, tables and navigation. Standard is 145%.</p>
             </div>
             <div className="range-setting">
               <div className="range-readout"><span>{densityLabel}</span><output htmlFor="density-range">{display.density}%</output></div>
@@ -105,7 +106,7 @@ export default function Settings({ display, onChange }) {
                 aria-valuetext={`${densityLabel}, ${display.density} percent`}
                 onChange={(event) => onChange('density', Number(event.target.value))}
               />
-              <div className="range-labels" aria-hidden="true"><span>Compact</span><span>Standard</span><span>2× spacious</span></div>
+              <div className="range-labels" aria-hidden="true"><span>Compact</span><span style={{ left: `${STANDARD_DENSITY / 2}%` }}>Standard</span><span>2× spacious</span></div>
             </div>
           </section>
         </div>

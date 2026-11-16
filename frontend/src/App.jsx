@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AlertCircle, BrainCircuit, FlaskConical, Info, LogOut, Settings2, ShieldAlert, UserRound, LayoutDashboard, ListChecks, Menu, Upload, X } from 'lucide-react'
-import { api, getDoctor, serverOutdated, setDoctor } from './lib'
+import { api, getDoctor, serverOutdated, setDoctor, STANDARD_DENSITY } from './lib'
 import SignIn from './pages/SignIn'
 import OutdatedServer from './components/OutdatedServer'
 import Dashboard from './pages/Dashboard'
@@ -35,17 +35,12 @@ function storedRange(key, fallback, max = 100) {
   return Number.isFinite(value) ? Math.max(0, Math.min(max, value)) : fallback
 }
 
+// Interface spacing: 145% is the standard. Settings saved before this standard (older
+// density.version) are reset once to it; after that the doctor's own choice is kept.
 function storedDensity(key, versionKey) {
-  const saved = localStorage.getItem(key)
-  const currentScale = localStorage.getItem(versionKey) === '2'
-  if (saved === 'comfortable') return 100
-  if (saved === 'compact') return 0
-  if (saved === null || saved === '') return 100
-  const value = Number(saved)
-  if (!Number.isFinite(value)) return 100
-  return currentScale
-    ? Math.max(0, Math.min(200, value))
-    : Math.max(0, Math.min(100, 100 - value))
+  if (localStorage.getItem(versionKey) !== '3') return STANDARD_DENSITY
+  const value = Number(localStorage.getItem(key))
+  return Number.isFinite(value) && localStorage.getItem(key) !== '' ? Math.max(0, Math.min(200, value)) : STANDARD_DENSITY
 }
 
 function loadDisplaySettings(doctor) {
@@ -96,7 +91,7 @@ export default function App() {
   const [displaySettings, setDisplaySettings] = useState(() => loadDisplaySettings(getDoctor()))
   const updateDisplaySetting = (key, value) => {
     localStorage.setItem(preferenceKey(doctor, key), value)
-    if (key === 'density') localStorage.setItem(preferenceKey(doctor, 'density.version'), '2')
+    if (key === 'density') localStorage.setItem(preferenceKey(doctor, 'density.version'), '3')
     setDisplaySettings((current) => ({ ...current, [key]: value }))
   }
   useEffect(() => {
