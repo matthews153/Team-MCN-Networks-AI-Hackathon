@@ -119,7 +119,7 @@ export default function Queue({ cases, demo, doctor, onChange }) {
           <div className="table-scroll">
           <table className="table queue-table">
             <thead>
-              <tr><th>Priority</th><th>Patient</th><th>AI interpretation</th><th>Probabilities</th><th>Symptoms</th><th className="num">HR</th><th className="num">Quality</th><th>Status</th><th>Received</th><th>Uploaded by</th></tr>
+              <tr><th>Priority</th><th>Patient</th><th>AI interpretation</th><th>Doctor interpretation</th><th>Probabilities</th><th>Symptoms</th><th className="num">HR</th><th className="num">Quality</th><th>Status</th><th>Received</th><th>Uploaded by</th></tr>
             </thead>
             <tbody>
               {rows.map((c) => (
@@ -130,6 +130,11 @@ export default function Queue({ cases, demo, doctor, onChange }) {
                     {queuePos.rank.has(c.id) && <div className="muted small queue-pos" title="Reading order among the pending cases shown">#{queuePos.rank.get(c.id)} of {queuePos.total} to read</div>}</td>
                   <td><strong>{c.patient?.patient_id || c.id}</strong>{c.demo && <span className="demo-tag" title="Demo case built from a PTB-XL test ECG">Demo</span>}<div className="muted small">{c.patient?.age ? `${Math.round(c.patient.age)}y` : ''} {c.patient?.sex || ''} {c.patient?.facility ? `· ${c.patient.facility}` : ''}</div></td>
                   <td><Findings flagged={c.flagged} category={c.category} />{c.uncertain.length > 0 && c.flagged.length > 0 && <div className="muted" style={{ fontSize: 11 }}>uncertain: {c.uncertain.join(', ')}</div>}</td>
+                  <td className="small">
+                    {c.review.doctor_labels?.length
+                      ? c.review.doctor_labels.map((label) => <span className="chip on" key={label} style={{ margin: '2px 3px 2px 0' }}>{CLASS_SHORT[label] || label}</span>)
+                      : <span className="muted">—</span>}
+                  </td>
                   <td><Spark probs={c.probs} /></td>
                   <td className="small text-2" style={{ maxWidth: 170 }}>{c.patient?.symptoms?.length ? c.patient.symptoms.join(', ') : '—'}</td>
                   <td className="num">{c.heart_rate ? Math.round(c.heart_rate) : '—'}</td>
